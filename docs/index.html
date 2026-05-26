@@ -814,7 +814,20 @@
       }, SYNC_INTERVAL_MS);
 
       flushPending().then(() => updatePendingBadge());
-      ui.permPrompt.classList.add('show');
+
+      // Si la permission caméra a déjà été accordée, démarrer le scanner sans prompt.
+      let cameraGranted = false;
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const status = await navigator.permissions.query({ name: 'camera' });
+          cameraGranted = (status.state === 'granted');
+        } catch (e) { /* certains navigateurs ne supportent pas 'camera' ici */ }
+      }
+      if (cameraGranted) {
+        startScanner();
+      } else {
+        ui.permPrompt.classList.add('show');
+      }
     }
 
     boot();
