@@ -1,10 +1,10 @@
 <!DOCTYPE html>
 <html lang="fr">
 <head>
-  <base target="_top">
   <meta charset="UTF-8">
   <meta http-equiv="X-UA-Compatible" content="IE=edge">
   <title>Tournée des Pastilles</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -33,35 +33,36 @@
 
     header {
       background: #0b6e2d;
-      padding: 10px 14px;
+      padding: 16px 18px;
       display: flex;
       align-items: center;
       justify-content: space-between;
       flex-shrink: 0;
       box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      padding-top: max(16px, env(safe-area-inset-top));
     }
 
     header h1 {
-      font-size: 16px;
-      font-weight: 600;
+      font-size: 22px;
+      font-weight: 700;
     }
-
-    #status-dot {
-      width: 12px;
-      height: 12px;
-      border-radius: 50%;
-      background: #888;
-      transition: background 0.3s;
-    }
-    #status-dot.online { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
-    #status-dot.offline { background: #f87171; box-shadow: 0 0 8px #f87171; }
 
     .status-bar {
       display: flex;
       align-items: center;
-      gap: 8px;
-      font-size: 12px;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 600;
     }
+    #status-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #888;
+      transition: background 0.3s;
+    }
+    #status-dot.online { background: #4ade80; box-shadow: 0 0 10px #4ade80; }
+    #status-dot.offline { background: #f87171; box-shadow: 0 0 10px #f87171; }
 
     #reader {
       flex: 1;
@@ -90,106 +91,199 @@
     }
     .scan-overlay::before {
       content: '';
-      width: 70vmin;
-      max-width: 320px;
+      width: 75vmin;
+      max-width: 360px;
       aspect-ratio: 1;
-      border: 3px solid rgba(255,255,255,0.7);
-      border-radius: 16px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.35);
+      border: 4px solid rgba(255,255,255,0.8);
+      border-radius: 20px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
     }
 
-    .flash {
+    .scan-hint {
       position: absolute;
-      inset: 0;
-      background: transparent;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.85);
+      font-size: 16px;
+      font-weight: 600;
+      background: rgba(0,0,0,0.5);
+      padding: 10px 18px;
+      border-radius: 999px;
+      z-index: 5;
       pointer-events: none;
-      z-index: 10;
-      transition: background 0.15s;
+      text-align: center;
     }
-    .flash.success { background: rgba(74, 222, 128, 0.55); }
-    .flash.error { background: rgba(248, 113, 113, 0.55); }
-    .flash.dup { background: rgba(251, 191, 36, 0.55); }
 
     footer {
       background: #141414;
-      padding: 12px 14px;
+      padding: 14px 16px;
+      padding-bottom: max(14px, env(safe-area-inset-bottom));
       flex-shrink: 0;
       border-top: 1px solid #2a2a2a;
-    }
-
-    .last-scan {
-      display: flex;
-      align-items: center;
-      gap: 10px;
-      min-height: 44px;
-    }
-    .last-scan-icon {
-      width: 36px;
-      height: 36px;
-      border-radius: 50%;
-      background: #1f1f1f;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      flex-shrink: 0;
-    }
-    .last-scan-icon.success { background: #0b6e2d; }
-    .last-scan-icon.dup { background: #92580d; }
-    .last-scan-info {
-      flex: 1;
-      min-width: 0;
-    }
-    .last-scan-point {
-      font-size: 14px;
-      font-weight: 600;
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-    }
-    .last-scan-time {
-      font-size: 11px;
-      color: #888;
-      margin-top: 2px;
     }
 
     .pending-row {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid #2a2a2a;
-      font-size: 12px;
-      color: #aaa;
+      gap: 12px;
     }
     .pending-badge {
       background: #2a2a2a;
-      padding: 4px 10px;
+      padding: 10px 16px;
       border-radius: 999px;
-      font-weight: 600;
+      font-weight: 700;
+      font-size: 16px;
+      flex: 1;
+      text-align: center;
     }
     .pending-badge.has-pending {
       background: #92580d;
       color: #fff;
     }
+    .pending-badge.all-synced {
+      background: #0b6e2d;
+      color: #fff;
+    }
     button {
       background: #1f1f1f;
       color: #fff;
-      border: 1px solid #444;
-      padding: 6px 12px;
-      border-radius: 6px;
-      font-size: 12px;
+      border: 1px solid #555;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
       cursor: pointer;
       font-family: inherit;
+      min-height: 44px;
     }
-    button:active { background: #2a2a2a; }
+    button:active { background: #2a2a2a; transform: scale(0.97); }
     button:disabled { opacity: 0.5; }
 
+    /* === Overlay de confirmation après scan === */
+    #confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10,10,10,0.96);
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      padding-top: max(24px, env(safe-area-inset-top));
+      padding-bottom: max(24px, env(safe-area-inset-bottom));
+      text-align: center;
+      animation: fadeIn 0.15s ease-out;
+    }
+    #confirm-overlay.show { display: flex; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes pop {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .confirm-icon {
+      width: 130px;
+      height: 130px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 80px;
+      font-weight: 900;
+      margin-bottom: 24px;
+      animation: pop 0.35s ease-out;
+    }
+    .confirm-icon.success { background: #0b6e2d; color: #fff; }
+    .confirm-icon.error { background: #b91c1c; color: #fff; }
+
+    .confirm-point {
+      font-size: 26px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 24px;
+      max-width: 92%;
+      word-wrap: break-word;
+    }
+
+    .confirm-status {
+      font-size: 19px;
+      font-weight: 700;
+      padding: 14px 22px;
+      border-radius: 12px;
+      margin-bottom: 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .confirm-status.syncing {
+      background: #1e3a8a;
+      color: #cfe0ff;
+    }
+    .confirm-status.synced {
+      background: #0b6e2d;
+      color: #fff;
+    }
+    .confirm-status.pending {
+      background: #92580d;
+      color: #fff;
+    }
+    .confirm-status.error {
+      background: #b91c1c;
+      color: #fff;
+    }
+
+    .confirm-time {
+      color: #888;
+      font-size: 15px;
+      margin-bottom: 30px;
+    }
+
+    .confirm-actions {
+      width: 100%;
+      max-width: 420px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .confirm-actions button {
+      background: #0b6e2d;
+      color: #fff;
+      padding: 18px;
+      font-size: 19px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      min-height: 60px;
+    }
+    .confirm-actions button.secondary {
+      background: #2a2a2a;
+      border: 1px solid #555;
+    }
+
+    /* spinner */
+    .spinner {
+      width: 22px;
+      height: 22px;
+      border: 3px solid rgba(255,255,255,0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* === Permission prompt initial === */
     #permission-prompt {
       position: absolute;
       inset: 0;
-      background: rgba(0,0,0,0.92);
+      background: rgba(0,0,0,0.95);
       z-index: 100;
       display: none;
       flex-direction: column;
@@ -199,14 +293,16 @@
       text-align: center;
     }
     #permission-prompt.show { display: flex; }
-    #permission-prompt h2 { font-size: 20px; margin-bottom: 12px; }
-    #permission-prompt p { font-size: 14px; line-height: 1.5; color: #ccc; margin-bottom: 20px; max-width: 320px; }
+    #permission-prompt h2 { font-size: 24px; margin-bottom: 14px; }
+    #permission-prompt p { font-size: 17px; line-height: 1.5; color: #ccc; margin-bottom: 28px; max-width: 380px; }
     #permission-prompt button {
       background: #0b6e2d;
-      padding: 14px 28px;
-      font-size: 16px;
+      padding: 18px 36px;
+      font-size: 19px;
+      font-weight: 700;
       border: none;
-      font-weight: 600;
+      min-height: 60px;
+      border-radius: 12px;
     }
   </style>
 </head>
@@ -222,23 +318,31 @@
 
     <div id="reader">
       <div class="scan-overlay"></div>
-      <div id="flash" class="flash"></div>
+      <div class="scan-hint">Pointe la caméra sur la pastille</div>
     </div>
 
     <footer>
-      <div class="last-scan" id="last-scan">
-        <div class="last-scan-icon" id="last-scan-icon">—</div>
-        <div class="last-scan-info">
-          <div class="last-scan-point" id="last-scan-point">En attente du premier scan…</div>
-          <div class="last-scan-time" id="last-scan-time"></div>
-        </div>
-      </div>
       <div class="pending-row">
-        <span class="pending-badge" id="pending-badge">0 en attente</span>
+        <span class="pending-badge all-synced" id="pending-badge">Tout est synchronisé</span>
         <button id="sync-btn">Synchroniser</button>
       </div>
     </footer>
 
+    <!-- Overlay de confirmation après scan -->
+    <div id="confirm-overlay">
+      <div class="confirm-icon success" id="confirm-icon">✓</div>
+      <div class="confirm-point" id="confirm-point">—</div>
+      <div class="confirm-status syncing" id="confirm-status">
+        <span class="spinner"></span>
+        <span id="confirm-status-text">Envoi en cours…</span>
+      </div>
+      <div class="confirm-time" id="confirm-time"></div>
+      <div class="confirm-actions">
+        <button id="confirm-next-btn">Scanner la prochaine</button>
+      </div>
+    </div>
+
+    <!-- Prompt de permission caméra au démarrage -->
     <div id="permission-prompt">
       <h2>Autoriser la caméra</h2>
       <p>L'application a besoin d'accéder à la caméra pour scanner les pastilles QR.</p>
@@ -251,29 +355,32 @@
   (function() {
     'use strict';
 
-    // URL du backend Apps Script (déployé séparément, écrit dans Google Sheets)
     const APP_URL = 'https://script.google.com/macros/s/AKfycbz9arlNh79x5taFzUYcEIWVlAsGLQkoEtPfvJ0shukdnAnR64AKfMGJLpqb4R1kCltK/exec';
-    const DEDUP_WINDOW_MS = 8000;
+    const SHARED_SECRET = 'tournee-pastilles-chr-2026';
+    const MULTI_FRAME_WINDOW_MS = 1500;
     const SYNC_INTERVAL_MS = 30000;
 
     const ui = {
       reader: document.getElementById('reader'),
-      flash: document.getElementById('flash'),
       statusDot: document.getElementById('status-dot'),
       statusText: document.getElementById('status-text'),
-      lastScan: document.getElementById('last-scan'),
-      lastScanIcon: document.getElementById('last-scan-icon'),
-      lastScanPoint: document.getElementById('last-scan-point'),
-      lastScanTime: document.getElementById('last-scan-time'),
       pendingBadge: document.getElementById('pending-badge'),
       syncBtn: document.getElementById('sync-btn'),
       permPrompt: document.getElementById('permission-prompt'),
       startBtn: document.getElementById('start-btn'),
+      confirmOverlay: document.getElementById('confirm-overlay'),
+      confirmIcon: document.getElementById('confirm-icon'),
+      confirmPoint: document.getElementById('confirm-point'),
+      confirmStatus: document.getElementById('confirm-status'),
+      confirmStatusText: document.getElementById('confirm-status-text'),
+      confirmTime: document.getElementById('confirm-time'),
+      confirmNextBtn: document.getElementById('confirm-next-btn'),
     };
 
     let scanner = null;
     let isSyncing = false;
-    let lastScanByPoint = new Map();
+    let lastFrameByPoint = new Map();
+    let overlayOpen = false;
 
     // === IndexedDB ===
     const DB_NAME = 'scan-pastilles-db';
@@ -292,7 +399,6 @@
         req.onerror = () => reject(req.error);
       });
     }
-
     async function dbAdd(scan) {
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -302,7 +408,6 @@
         req.onerror = () => reject(req.error);
       });
     }
-
     async function dbGetAll() {
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -312,7 +417,6 @@
         req.onerror = () => reject(req.error);
       });
     }
-
     async function dbDelete(ids) {
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -323,7 +427,6 @@
         tx.onerror = () => reject(tx.error);
       });
     }
-
     async function dbCount() {
       const db = await openDB();
       return new Promise((resolve, reject) => {
@@ -334,12 +437,7 @@
       });
     }
 
-    // === UI helpers ===
-    function flash(type) {
-      ui.flash.className = 'flash ' + type;
-      setTimeout(() => { ui.flash.className = 'flash'; }, 250);
-    }
-
+    // === Feedback ===
     function vibrate(pattern) {
       if (navigator.vibrate) navigator.vibrate(pattern);
     }
@@ -348,31 +446,29 @@
     function beep(freq, duration) {
       try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
         const osc = audioCtx.createOscillator();
         const gain = audioCtx.createGain();
         osc.connect(gain);
         gain.connect(audioCtx.destination);
         osc.frequency.value = freq;
         osc.type = 'sine';
-        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
         gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
         osc.start();
         osc.stop(audioCtx.currentTime + duration);
       } catch (e) { /* ignore */ }
     }
 
-    function updateLastScan(point, ts, type) {
-      ui.lastScanIcon.className = 'last-scan-icon ' + type;
-      ui.lastScanIcon.textContent = type === 'dup' ? '!' : '✓';
-      ui.lastScanPoint.textContent = point;
-      const d = new Date(ts);
-      ui.lastScanTime.textContent = d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-    }
-
     async function updatePendingBadge() {
       const n = await dbCount();
-      ui.pendingBadge.textContent = n === 0 ? 'Tout est synchronisé' : (n + ' en attente');
-      ui.pendingBadge.className = 'pending-badge' + (n > 0 ? ' has-pending' : '');
+      if (n === 0) {
+        ui.pendingBadge.textContent = 'Tout est synchronisé';
+        ui.pendingBadge.className = 'pending-badge all-synced';
+      } else {
+        ui.pendingBadge.textContent = n + ' en attente d\'envoi';
+        ui.pendingBadge.className = 'pending-badge has-pending';
+      }
       return n;
     }
 
@@ -381,89 +477,130 @@
       ui.statusText.textContent = online ? 'En ligne' : 'Hors ligne';
     }
 
+    // === Confirm overlay ===
+    function showConfirmOverlay(point, ts) {
+      overlayOpen = true;
+      ui.confirmIcon.className = 'confirm-icon success';
+      ui.confirmIcon.textContent = '✓';
+      ui.confirmPoint.textContent = point;
+      ui.confirmStatus.className = 'confirm-status syncing';
+      ui.confirmStatus.innerHTML = '<span class="spinner"></span><span id="confirm-status-text">Envoi en cours…</span>';
+      const d = new Date(ts);
+      ui.confirmTime.textContent = 'Scanné à ' + d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      ui.confirmOverlay.classList.add('show');
+    }
+    function setConfirmStatusSynced() {
+      ui.confirmStatus.className = 'confirm-status synced';
+      ui.confirmStatus.innerHTML = '<span style="font-size:24px">✓</span><span>Enregistré dans le Sheets</span>';
+    }
+    function setConfirmStatusPending(n) {
+      ui.confirmStatus.className = 'confirm-status pending';
+      ui.confirmStatus.innerHTML = '<span style="font-size:24px">💾</span><span>Sauvegardé · sera envoyé au retour du signal' + (n > 1 ? ' (' + n + ' en attente)' : '') + '</span>';
+    }
+    function setConfirmStatusError(msg) {
+      ui.confirmStatus.className = 'confirm-status error';
+      ui.confirmStatus.innerHTML = '<span style="font-size:24px">⚠</span><span>' + msg + '</span>';
+    }
+    async function closeConfirmOverlay() {
+      ui.confirmOverlay.classList.remove('show');
+      overlayOpen = false;
+      lastFrameByPoint.clear();
+      if (scanner) {
+        try { await scanner.resume(); } catch (e) { /* déjà actif */ }
+      }
+    }
+
     // === Scan handling ===
     async function handleScan(decoded) {
+      if (overlayOpen) return;
+
       const now = Date.now();
-      const last = lastScanByPoint.get(decoded) || 0;
-      if (now - last < DEDUP_WINDOW_MS) {
-        flash('dup');
-        vibrate(50);
-        beep(440, 0.08);
-        updateLastScan(decoded, now, 'dup');
-        return;
+      const last = lastFrameByPoint.get(decoded) || 0;
+      // Dedup silencieux pour les multi-frames qui détectent le même QR
+      if (now - last < MULTI_FRAME_WINDOW_MS) return;
+      lastFrameByPoint.set(decoded, now);
+
+      // Pause le scanner immédiatement pour éviter d'autres détections
+      if (scanner) {
+        try { await scanner.pause(true); } catch (e) { /* ignore */ }
       }
-      lastScanByPoint.set(decoded, now);
+
+      // Feedback immédiat de capture
+      vibrate(80);
+      beep(880, 0.14);
 
       const scan = { ts: new Date(now).toISOString(), point: decoded };
       try {
         await dbAdd(scan);
       } catch (e) {
-        flash('error');
-        vibrate([100, 80, 100, 80, 100]);
-        updateLastScan('Erreur stockage local', now, 'dup');
+        showConfirmOverlay(decoded, now);
+        setConfirmStatusError('Erreur stockage local');
         return;
       }
 
-      flash('success');
-      vibrate(80);
-      beep(880, 0.12);
-      updateLastScan(decoded, now, 'success');
+      // Afficher l'overlay avec statut "envoi en cours"
+      showConfirmOverlay(decoded, now);
       await updatePendingBadge();
 
-      flushPending();
+      // Tentative d'envoi immédiate
+      const result = await flushPending();
+
+      const pendingCount = await updatePendingBadge();
+      if (result === 'synced') {
+        setConfirmStatusSynced();
+        beep(1320, 0.1);
+      } else if (result === 'offline') {
+        setConfirmStatusPending(pendingCount);
+      } else {
+        setConfirmStatusPending(pendingCount);
+      }
     }
 
     // === Sync ===
+    // returns: 'synced' | 'offline' | 'noop'
     async function flushPending() {
-      if (isSyncing) return;
+      if (isSyncing) return 'noop';
+      const items = await dbGetAll();
+      if (items.length === 0) return 'noop';
+
       if (!navigator.onLine) {
         setOnlineStatus(false);
-        return;
+        return 'offline';
       }
+
       isSyncing = true;
       try {
-        const items = await dbGetAll();
-        if (items.length === 0) {
-          isSyncing = false;
-          return;
-        }
-
         const body = JSON.stringify({
-          secret: 'tournee-pastilles-chr-2026',
+          secret: SHARED_SECRET,
           scans: items.map(i => ({ ts: i.ts, point: i.point }))
         });
-
-        // text/plain pour éviter le preflight CORS (Apps Script ne gère pas OPTIONS).
-        // Apps Script lit le body via e.postData.contents qu'on parse en JSON côté serveur.
         const resp = await fetch(APP_URL, {
           method: 'POST',
           body: body,
           redirect: 'follow',
           headers: { 'Content-Type': 'text/plain;charset=utf-8' }
         });
-
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
-
         const data = await resp.json();
         if (!data.ok) throw new Error(data.error || 'unknown');
 
         await dbDelete(items.map(i => i.id));
         setOnlineStatus(true);
-        await updatePendingBadge();
+        return 'synced';
       } catch (err) {
         setOnlineStatus(false);
         console.warn('Sync failed:', err);
+        return 'offline';
       } finally {
         isSyncing = false;
       }
     }
 
-    // === Scanner init ===
+    // === Scanner ===
     async function startScanner() {
       ui.permPrompt.classList.remove('show');
       try {
         if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-
         scanner = new Html5Qrcode('reader', { verbose: false });
         const config = {
           fps: 10,
@@ -472,14 +609,14 @@
             const size = Math.floor(min * 0.7);
             return { width: size, height: size };
           },
-          aspectRatio: window.innerWidth / (window.innerHeight - 120),
+          aspectRatio: window.innerWidth / (window.innerHeight - 180),
           formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
         };
         await scanner.start(
           { facingMode: 'environment' },
           config,
           (decoded) => handleScan(decoded),
-          () => { /* ignore scan failures (frames without QR) */ }
+          () => { /* frames sans QR — ignorer */ }
         );
       } catch (err) {
         ui.permPrompt.classList.add('show');
@@ -494,14 +631,31 @@
       setOnlineStatus(navigator.onLine);
 
       ui.startBtn.addEventListener('click', startScanner);
-      ui.syncBtn.addEventListener('click', flushPending);
+      ui.syncBtn.addEventListener('click', async () => {
+        const result = await flushPending();
+        await updatePendingBadge();
+        if (result === 'synced') {
+          vibrate(60);
+          beep(1320, 0.1);
+        } else if (result === 'offline') {
+          vibrate([60, 50, 60]);
+        }
+      });
+      ui.confirmNextBtn.addEventListener('click', closeConfirmOverlay);
 
-      window.addEventListener('online', () => { setOnlineStatus(true); flushPending(); });
+      window.addEventListener('online', () => {
+        setOnlineStatus(true);
+        flushPending().then(() => updatePendingBadge());
+      });
       window.addEventListener('offline', () => setOnlineStatus(false));
 
-      setInterval(() => { if (navigator.onLine) flushPending(); }, SYNC_INTERVAL_MS);
+      setInterval(() => {
+        if (navigator.onLine && !overlayOpen) {
+          flushPending().then(() => updatePendingBadge());
+        }
+      }, SYNC_INTERVAL_MS);
 
-      flushPending();
+      flushPending().then(() => updatePendingBadge());
       ui.permPrompt.classList.add('show');
     }
 
