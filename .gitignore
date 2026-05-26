@@ -1,0 +1,8 @@
+node_modules/
+.clasprc.json
+_login_*.txt
+_auth_helper.js
+_tmp_*
+*.log
+.DS_Store
+Thumbs.db

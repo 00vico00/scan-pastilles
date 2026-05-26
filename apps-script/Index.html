@@ -1,0 +1,508 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <base target="_top">
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <title>Tournée des Pastilles</title>
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0b6e2d">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230b6e2d'/%3E%3Crect x='15' y='15' width='25' height='25' fill='white'/%3E%3Crect x='60' y='15' width='25' height='25' fill='white'/%3E%3Crect x='15' y='60' width='25' height='25' fill='white'/%3E%3Crect x='50' y='50' width='10' height='10' fill='white'/%3E%3Crect x='70' y='60' width='15' height='15' fill='white'/%3E%3C/svg%3E">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    header {
+      background: #0b6e2d;
+      padding: 10px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+    }
+
+    header h1 {
+      font-size: 16px;
+      font-weight: 600;
+    }
+
+    #status-dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      background: #888;
+      transition: background 0.3s;
+    }
+    #status-dot.online { background: #4ade80; box-shadow: 0 0 8px #4ade80; }
+    #status-dot.offline { background: #f87171; box-shadow: 0 0 8px #f87171; }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 12px;
+    }
+
+    #reader {
+      flex: 1;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+      min-height: 0;
+    }
+    #reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+    #reader__dashboard_section { display: none !important; }
+    #reader__scan_region { background: transparent !important; }
+    #reader__scan_region img { display: none !important; }
+
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 5;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .scan-overlay::before {
+      content: '';
+      width: 70vmin;
+      max-width: 320px;
+      aspect-ratio: 1;
+      border: 3px solid rgba(255,255,255,0.7);
+      border-radius: 16px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.35);
+    }
+
+    .flash {
+      position: absolute;
+      inset: 0;
+      background: transparent;
+      pointer-events: none;
+      z-index: 10;
+      transition: background 0.15s;
+    }
+    .flash.success { background: rgba(74, 222, 128, 0.55); }
+    .flash.error { background: rgba(248, 113, 113, 0.55); }
+    .flash.dup { background: rgba(251, 191, 36, 0.55); }
+
+    footer {
+      background: #141414;
+      padding: 12px 14px;
+      flex-shrink: 0;
+      border-top: 1px solid #2a2a2a;
+    }
+
+    .last-scan {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      min-height: 44px;
+    }
+    .last-scan-icon {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      background: #1f1f1f;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      flex-shrink: 0;
+    }
+    .last-scan-icon.success { background: #0b6e2d; }
+    .last-scan-icon.dup { background: #92580d; }
+    .last-scan-info {
+      flex: 1;
+      min-width: 0;
+    }
+    .last-scan-point {
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .last-scan-time {
+      font-size: 11px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .pending-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid #2a2a2a;
+      font-size: 12px;
+      color: #aaa;
+    }
+    .pending-badge {
+      background: #2a2a2a;
+      padding: 4px 10px;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    .pending-badge.has-pending {
+      background: #92580d;
+      color: #fff;
+    }
+    button {
+      background: #1f1f1f;
+      color: #fff;
+      border: 1px solid #444;
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 12px;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    button:active { background: #2a2a2a; }
+    button:disabled { opacity: 0.5; }
+
+    #permission-prompt {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.92);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      text-align: center;
+    }
+    #permission-prompt.show { display: flex; }
+    #permission-prompt h2 { font-size: 20px; margin-bottom: 12px; }
+    #permission-prompt p { font-size: 14px; line-height: 1.5; color: #ccc; margin-bottom: 20px; max-width: 320px; }
+    #permission-prompt button {
+      background: #0b6e2d;
+      padding: 14px 28px;
+      font-size: 16px;
+      border: none;
+      font-weight: 600;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Tournée des Pastilles</h1>
+      <div class="status-bar">
+        <span id="status-text">…</span>
+        <span id="status-dot"></span>
+      </div>
+    </header>
+
+    <div id="reader">
+      <div class="scan-overlay"></div>
+      <div id="flash" class="flash"></div>
+    </div>
+
+    <footer>
+      <div class="last-scan" id="last-scan">
+        <div class="last-scan-icon" id="last-scan-icon">—</div>
+        <div class="last-scan-info">
+          <div class="last-scan-point" id="last-scan-point">En attente du premier scan…</div>
+          <div class="last-scan-time" id="last-scan-time"></div>
+        </div>
+      </div>
+      <div class="pending-row">
+        <span class="pending-badge" id="pending-badge">0 en attente</span>
+        <button id="sync-btn">Synchroniser</button>
+      </div>
+    </footer>
+
+    <div id="permission-prompt">
+      <h2>Autoriser la caméra</h2>
+      <p>L'application a besoin d'accéder à la caméra pour scanner les pastilles QR.</p>
+      <button id="start-btn">Démarrer le scanner</button>
+    </div>
+  </div>
+
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    const APP_URL = window.location.href.split('?')[0];
+    const DEDUP_WINDOW_MS = 8000;
+    const SYNC_INTERVAL_MS = 30000;
+
+    const ui = {
+      reader: document.getElementById('reader'),
+      flash: document.getElementById('flash'),
+      statusDot: document.getElementById('status-dot'),
+      statusText: document.getElementById('status-text'),
+      lastScan: document.getElementById('last-scan'),
+      lastScanIcon: document.getElementById('last-scan-icon'),
+      lastScanPoint: document.getElementById('last-scan-point'),
+      lastScanTime: document.getElementById('last-scan-time'),
+      pendingBadge: document.getElementById('pending-badge'),
+      syncBtn: document.getElementById('sync-btn'),
+      permPrompt: document.getElementById('permission-prompt'),
+      startBtn: document.getElementById('start-btn'),
+    };
+
+    let scanner = null;
+    let isSyncing = false;
+    let lastScanByPoint = new Map();
+
+    // === IndexedDB ===
+    const DB_NAME = 'scan-pastilles-db';
+    const STORE = 'pending';
+
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) {
+            db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbAdd(scan) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const req = tx.objectStore(STORE).add(scan);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbGetAll() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    async function dbDelete(ids) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        ids.forEach(id => store.delete(id));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+
+    async function dbCount() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).count();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    // === UI helpers ===
+    function flash(type) {
+      ui.flash.className = 'flash ' + type;
+      setTimeout(() => { ui.flash.className = 'flash'; }, 250);
+    }
+
+    function vibrate(pattern) {
+      if (navigator.vibrate) navigator.vibrate(pattern);
+    }
+
+    let audioCtx = null;
+    function beep(freq, duration) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.frequency.value = freq;
+        osc.type = 'sine';
+        gain.gain.setValueAtTime(0.18, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch (e) { /* ignore */ }
+    }
+
+    function updateLastScan(point, ts, type) {
+      ui.lastScanIcon.className = 'last-scan-icon ' + type;
+      ui.lastScanIcon.textContent = type === 'dup' ? '!' : '✓';
+      ui.lastScanPoint.textContent = point;
+      const d = new Date(ts);
+      ui.lastScanTime.textContent = d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    async function updatePendingBadge() {
+      const n = await dbCount();
+      ui.pendingBadge.textContent = n === 0 ? 'Tout est synchronisé' : (n + ' en attente');
+      ui.pendingBadge.className = 'pending-badge' + (n > 0 ? ' has-pending' : '');
+      return n;
+    }
+
+    function setOnlineStatus(online) {
+      ui.statusDot.className = online ? 'online' : 'offline';
+      ui.statusText.textContent = online ? 'En ligne' : 'Hors ligne';
+    }
+
+    // === Scan handling ===
+    async function handleScan(decoded) {
+      const now = Date.now();
+      const last = lastScanByPoint.get(decoded) || 0;
+      if (now - last < DEDUP_WINDOW_MS) {
+        flash('dup');
+        vibrate(50);
+        beep(440, 0.08);
+        updateLastScan(decoded, now, 'dup');
+        return;
+      }
+      lastScanByPoint.set(decoded, now);
+
+      const scan = { ts: new Date(now).toISOString(), point: decoded };
+      try {
+        await dbAdd(scan);
+      } catch (e) {
+        flash('error');
+        vibrate([100, 80, 100, 80, 100]);
+        updateLastScan('Erreur stockage local', now, 'dup');
+        return;
+      }
+
+      flash('success');
+      vibrate(80);
+      beep(880, 0.12);
+      updateLastScan(decoded, now, 'success');
+      await updatePendingBadge();
+
+      flushPending();
+    }
+
+    // === Sync ===
+    async function flushPending() {
+      if (isSyncing) return;
+      if (!navigator.onLine) {
+        setOnlineStatus(false);
+        return;
+      }
+      isSyncing = true;
+      try {
+        const items = await dbGetAll();
+        if (items.length === 0) {
+          isSyncing = false;
+          return;
+        }
+
+        const body = JSON.stringify({
+          secret: 'tournee-pastilles-chr-2026',
+          scans: items.map(i => ({ ts: i.ts, point: i.point }))
+        });
+
+        const resp = await fetch(APP_URL, {
+          method: 'POST',
+          body: body,
+          redirect: 'follow'
+        });
+
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || 'unknown');
+
+        await dbDelete(items.map(i => i.id));
+        setOnlineStatus(true);
+        await updatePendingBadge();
+      } catch (err) {
+        setOnlineStatus(false);
+        console.warn('Sync failed:', err);
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    // === Scanner init ===
+    async function startScanner() {
+      ui.permPrompt.classList.remove('show');
+      try {
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+
+        scanner = new Html5Qrcode('reader', { verbose: false });
+        const config = {
+          fps: 10,
+          qrbox: (w, h) => {
+            const min = Math.min(w, h);
+            const size = Math.floor(min * 0.7);
+            return { width: size, height: size };
+          },
+          aspectRatio: window.innerWidth / (window.innerHeight - 120),
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        };
+        await scanner.start(
+          { facingMode: 'environment' },
+          config,
+          (decoded) => handleScan(decoded),
+          () => { /* ignore scan failures (frames without QR) */ }
+        );
+      } catch (err) {
+        ui.permPrompt.classList.add('show');
+        ui.permPrompt.querySelector('p').textContent =
+          'Impossible d\'accéder à la caméra : ' + (err.message || err);
+      }
+    }
+
+    // === Boot ===
+    async function boot() {
+      await updatePendingBadge();
+      setOnlineStatus(navigator.onLine);
+
+      ui.startBtn.addEventListener('click', startScanner);
+      ui.syncBtn.addEventListener('click', flushPending);
+
+      window.addEventListener('online', () => { setOnlineStatus(true); flushPending(); });
+      window.addEventListener('offline', () => setOnlineStatus(false));
+
+      setInterval(() => { if (navigator.onLine) flushPending(); }, SYNC_INTERVAL_MS);
+
+      flushPending();
+      ui.permPrompt.classList.add('show');
+    }
+
+    boot();
+  })();
+  </script>
+</body>
+</html>
