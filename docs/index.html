@@ -163,19 +163,17 @@
 
     .tour-progress-banner {
       position: absolute;
-      top: 14px;
-      left: 50%;
-      transform: translateX(-50%);
-      background: rgba(11, 110, 45, 0.92);
+      top: 18px;
+      left: 18px;
+      background: rgba(11, 110, 45, 0.95);
       color: #fff;
       font-weight: 700;
       font-size: 16px;
-      padding: 8px 18px;
+      padding: 9px 18px;
       border-radius: 999px;
-      z-index: 1001;
       pointer-events: none;
-      max-width: calc(100% - 130px);
       text-align: center;
+      white-space: nowrap;
     }
     .tour-progress-banner.complete {
       background: rgba(11, 110, 45, 0.95);
@@ -183,8 +181,8 @@
 
     .open-list-btn {
       position: absolute;
-      top: 12px;
-      right: 12px;
+      top: 14px;
+      right: 14px;
       height: 42px;
       padding: 0 16px;
       border-radius: 999px;
@@ -550,7 +548,7 @@
         </button>
         <div class="scan-overlay"></div>
         <div class="scan-hint">Pointe la caméra sur la pastille</div>
-        <div class="version-tag">v12</div>
+        <div class="version-tag">v13</div>
       </div>
     </div>
 
@@ -695,14 +693,11 @@
       const remaining = getRemainingTour();
       const total = TOURNEE_POINTS.length;
       const done = total - remaining.length;
-      if (done === 0) {
-        ui.tourProgressBanner.textContent = total + ' pastilles à scanner';
-        ui.tourProgressBanner.className = 'tour-progress-banner';
-      } else if (remaining.length === 0) {
-        ui.tourProgressBanner.textContent = '✓ Tournée terminée';
+      if (remaining.length === 0) {
+        ui.tourProgressBanner.textContent = '✓ ' + done + ' / ' + total;
         ui.tourProgressBanner.className = 'tour-progress-banner complete';
       } else {
-        ui.tourProgressBanner.textContent = done + '/' + total + ' scannées';
+        ui.tourProgressBanner.textContent = done + ' / ' + total;
         ui.tourProgressBanner.className = 'tour-progress-banner';
       }
     }
