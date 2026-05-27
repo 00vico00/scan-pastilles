@@ -683,7 +683,7 @@
       if (scanner) {
         try { await scanner.pause(true); } catch (e) {}
       }
-      vibrate(80);
+      vibrate([180, 80, 120]);
       beep(880, 0.14);
 
       const scan = { ts: new Date(now).toISOString(), point: decoded };
