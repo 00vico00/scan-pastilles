@@ -139,10 +139,34 @@
       border-radius: 999px;
       z-index: 5;
       pointer-events: none;
+      max-width: calc(100% - 130px);
+      text-align: center;
     }
     .tour-progress-banner.complete {
       background: rgba(11, 110, 45, 0.95);
     }
+
+    .reset-tour-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      width: 42px;
+      height: 42px;
+      border-radius: 50%;
+      background: rgba(0,0,0,0.55);
+      border: 1.5px solid rgba(255,255,255,0.5);
+      color: #fff;
+      font-size: 22px;
+      font-weight: 700;
+      z-index: 7;
+      padding: 0;
+      min-height: 42px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      cursor: pointer;
+    }
+    .reset-tour-btn:active { background: rgba(0,0,0,0.75); }
 
     button {
       background: #1f1f1f;
@@ -364,6 +388,7 @@
 
     <div id="reader">
       <div class="tour-progress-banner" id="tour-progress-banner"></div>
+      <button class="reset-tour-btn" id="reset-tour-btn" aria-label="Recommencer la tournée" title="Recommencer la tournée">↻</button>
       <div class="scan-overlay"></div>
       <div class="scan-hint">Pointe la caméra sur la pastille</div>
     </div>
@@ -436,6 +461,7 @@
       permPrompt: document.getElementById('permission-prompt'),
       startBtn: document.getElementById('start-btn'),
       tourProgressBanner: document.getElementById('tour-progress-banner'),
+      resetTourBtn: document.getElementById('reset-tour-btn'),
       confirmOverlay: document.getElementById('confirm-overlay'),
       confirmIcon: document.getElementById('confirm-icon'),
       confirmPoint: document.getElementById('confirm-point'),
@@ -593,7 +619,7 @@
       // Icône et notes
       if (info.isComplete) {
         ui.confirmIcon.className = 'confirm-icon complete';
-        ui.confirmIcon.textContent = '🎉';
+        ui.confirmIcon.textContent = '✓';
       } else if (info.wasAlready) {
         ui.confirmIcon.className = 'confirm-icon warn';
         ui.confirmIcon.textContent = '!';
@@ -625,11 +651,11 @@
       const d = new Date(ts);
       ui.confirmTime.textContent = 'Scanné à ' + d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
 
-      // Middle : soit "Tournée terminée!" soit liste des restantes
+      // Middle : soit "Tournée terminée" soit liste des restantes
       if (info.isComplete) {
         ui.confirmMiddle.innerHTML =
           '<div class="completed-section">'
-          + '<div class="completed-title">🎉 Tournée terminée!</div>'
+          + '<div class="completed-title">Tournée terminée</div>'
           + '<div class="completed-sub">Les ' + TOURNEE_POINTS.length + ' pastilles ont été scannées.</div>'
           + '</div>';
         ui.confirmNextBtn.textContent = 'Nouvelle tournée';
@@ -800,6 +826,16 @@
 
       ui.startBtn.addEventListener('click', startScanner);
       ui.confirmNextBtn.addEventListener('click', closeConfirmOverlay);
+      ui.resetTourBtn.addEventListener('click', () => {
+        const done = TOURNEE_POINTS.length - getRemainingTour().length;
+        const msg = done === 0
+          ? 'Recommencer la tournée ?'
+          : 'Recommencer la tournée ? Les ' + done + ' pastilles déjà cochées seront effacées de la tournée en cours.';
+        if (confirm(msg)) {
+          resetTour();
+          updateTourBanner();
+        }
+      });
 
       window.addEventListener('online', () => {
         setOnlineStatus(true);
