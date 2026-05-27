@@ -107,28 +107,8 @@
       pointer-events: none;
     }
     .overlays > * { pointer-events: auto; }
-    .overlays > .scan-overlay,
     .overlays > .scan-hint,
     .overlays > .tour-progress-banner { pointer-events: none; }
-
-    .scan-overlay {
-      position: absolute;
-      inset: 0;
-      pointer-events: none;
-      z-index: 1000;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .scan-overlay::before {
-      content: '';
-      width: 75vmin;
-      max-width: 360px;
-      aspect-ratio: 1;
-      border: 4px solid rgba(255,255,255,0.8);
-      border-radius: 20px;
-      box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
-    }
 
     .scan-hint {
       position: absolute;
@@ -532,7 +512,6 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           <span>Liste</span>
         </button>
-        <div class="scan-overlay"></div>
         <div class="scan-hint">Pointe la caméra sur la pastille</div>
       </div>
     </div>
@@ -1009,10 +988,9 @@
           fps: 10,
           qrbox: (w, h) => {
             const min = Math.min(w, h);
-            const size = Math.floor(min * 0.7);
+            const size = Math.floor(min * 0.8);
             return { width: size, height: size };
           },
-          aspectRatio: window.innerWidth / (window.innerHeight - 180),
           formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
         };
         await scanner.start(
