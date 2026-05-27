@@ -78,12 +78,17 @@
     }
     #pending-pill.visible { display: inline-flex; align-items: center; }
 
-    #reader {
+    #camera-wrap {
       flex: 1;
       position: relative;
       background: #000;
       overflow: hidden;
       min-height: 0;
+    }
+    #reader {
+      position: absolute;
+      inset: 0;
+      z-index: 1;
     }
     #reader video {
       width: 100% !important;
@@ -93,6 +98,18 @@
     #reader__dashboard_section { display: none !important; }
     #reader__scan_region { background: transparent !important; }
     #reader__scan_region img { display: none !important; }
+
+    /* Les overlays sont en frère de #reader DANS #camera-wrap, donc toujours dessinés au-dessus de la vidéo. */
+    .overlays {
+      position: absolute;
+      inset: 0;
+      z-index: 100;
+      pointer-events: none;
+    }
+    .overlays > * { pointer-events: auto; }
+    .overlays > .scan-overlay,
+    .overlays > .scan-hint,
+    .overlays > .version-tag { pointer-events: none; }
 
     .scan-overlay {
       position: absolute;
@@ -523,15 +540,18 @@
       </div>
     </header>
 
-    <div id="reader">
-      <div class="tour-progress-banner" id="tour-progress-banner"></div>
-      <button class="open-list-btn" id="open-list-btn" aria-label="Voir la liste des pastilles">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-        <span>Liste</span>
-      </button>
-      <div class="scan-overlay"></div>
-      <div class="scan-hint">Pointe la caméra sur la pastille</div>
-      <div class="version-tag">v11-killSW</div>
+    <div id="camera-wrap">
+      <div id="reader"></div>
+      <div class="overlays">
+        <div class="tour-progress-banner" id="tour-progress-banner"></div>
+        <button class="open-list-btn" id="open-list-btn" aria-label="Voir la liste des pastilles">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+          <span>Liste</span>
+        </button>
+        <div class="scan-overlay"></div>
+        <div class="scan-hint">Pointe la caméra sur la pastille</div>
+        <div class="version-tag">v12</div>
+      </div>
     </div>
 
     <!-- Vue Liste des pastilles -->
