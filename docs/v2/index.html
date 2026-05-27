@@ -1,0 +1,1087 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+  <meta http-equiv="Pragma" content="no-cache">
+  <meta http-equiv="Expires" content="0">
+  <title>Tournée des Pastilles</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="theme-color" content="#0b6e2d">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' fill='%230b6e2d'/%3E%3Crect x='15' y='15' width='25' height='25' fill='white'/%3E%3Crect x='60' y='15' width='25' height='25' fill='white'/%3E%3Crect x='15' y='60' width='25' height='25' fill='white'/%3E%3Crect x='50' y='50' width='10' height='10' fill='white'/%3E%3Crect x='70' y='60' width='15' height='15' fill='white'/%3E%3C/svg%3E">
+
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0a0a0a;
+      color: #fff;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    #app {
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      height: 100dvh;
+    }
+
+    header {
+      background: #0b6e2d;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-shrink: 0;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+      padding-top: max(16px, env(safe-area-inset-top));
+    }
+
+    header h1 {
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .status-bar {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 16px;
+      font-weight: 600;
+    }
+    #status-dot {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: #888;
+      transition: background 0.3s;
+    }
+    #status-dot.online { background: #4ade80; box-shadow: 0 0 10px #4ade80; }
+    #status-dot.offline { background: #f87171; box-shadow: 0 0 10px #f87171; }
+
+    #pending-pill {
+      display: none;
+      background: #92580d;
+      color: #fff;
+      padding: 5px 12px;
+      border-radius: 999px;
+      font-size: 14px;
+      font-weight: 700;
+    }
+    #pending-pill.visible { display: inline-flex; align-items: center; }
+
+    #reader {
+      flex: 1;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+      min-height: 0;
+    }
+    #reader video {
+      width: 100% !important;
+      height: 100% !important;
+      object-fit: cover !important;
+    }
+    #reader__dashboard_section { display: none !important; }
+    #reader__scan_region { background: transparent !important; }
+    #reader__scan_region img { display: none !important; }
+
+    .scan-overlay {
+      position: absolute;
+      inset: 0;
+      pointer-events: none;
+      z-index: 1000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .scan-overlay::before {
+      content: '';
+      width: 75vmin;
+      max-width: 360px;
+      aspect-ratio: 1;
+      border: 4px solid rgba(255,255,255,0.8);
+      border-radius: 20px;
+      box-shadow: 0 0 0 9999px rgba(0,0,0,0.4);
+    }
+
+    .scan-hint {
+      position: absolute;
+      bottom: 20px;
+      left: 50%;
+      transform: translateX(-50%);
+      color: rgba(255,255,255,0.85);
+      font-size: 16px;
+      font-weight: 600;
+      background: rgba(0,0,0,0.5);
+      padding: 10px 18px;
+      border-radius: 999px;
+      z-index: 1001;
+      pointer-events: none;
+      text-align: center;
+    }
+
+    .version-tag {
+      position: absolute;
+      bottom: 6px;
+      right: 8px;
+      color: rgba(255,255,255,0.45);
+      font-size: 10px;
+      font-weight: 600;
+      z-index: 1001;
+      pointer-events: none;
+      background: rgba(0,0,0,0.4);
+      padding: 2px 6px;
+      border-radius: 4px;
+      letter-spacing: 0.5px;
+    }
+
+    .tour-progress-banner {
+      position: absolute;
+      top: 14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(11, 110, 45, 0.92);
+      color: #fff;
+      font-weight: 700;
+      font-size: 16px;
+      padding: 8px 18px;
+      border-radius: 999px;
+      z-index: 1001;
+      pointer-events: none;
+      max-width: calc(100% - 130px);
+      text-align: center;
+    }
+    .tour-progress-banner.complete {
+      background: rgba(11, 110, 45, 0.95);
+    }
+
+    .open-list-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      height: 42px;
+      padding: 0 16px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.7);
+      border: 1.5px solid rgba(255,255,255,0.5);
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      z-index: 1002;
+      min-height: 42px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      cursor: pointer;
+    }
+    .open-list-btn:active { background: rgba(0,0,0,0.85); }
+    .open-list-btn svg { width: 20px; height: 20px; }
+
+    /* === Vue Liste === */
+    #list-overlay {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      z-index: 150;
+      display: none;
+      flex-direction: column;
+      padding-top: max(0px, env(safe-area-inset-top));
+      padding-bottom: max(0px, env(safe-area-inset-bottom));
+    }
+    #list-overlay.show { display: flex; }
+
+    .list-header {
+      background: #0b6e2d;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .list-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+      flex: 1;
+    }
+    .list-close-x {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 26px;
+      padding: 4px 8px;
+      cursor: pointer;
+      min-height: auto;
+    }
+
+    .list-progress {
+      padding: 18px 20px 8px;
+      text-align: center;
+    }
+    .list-progress-number {
+      font-size: 28px;
+      font-weight: 800;
+    }
+    .list-progress-label {
+      font-size: 14px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .list-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 16px 16px;
+    }
+
+    .list-section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 18px 4px 10px;
+    }
+    .list-section-title.remaining { color: #fbbf24; }
+    .list-section-title.done { color: #4ade80; }
+
+    .list-points {
+      list-style: none;
+      padding: 0;
+    }
+    .list-points li {
+      padding: 14px 14px;
+      margin-bottom: 6px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .list-points li.remaining {
+      background: #1a1a1a;
+      border-left: 4px solid #fbbf24;
+    }
+    .list-points li.done {
+      background: #1a2920;
+      color: #9fd6b3;
+      text-decoration: line-through;
+      text-decoration-color: rgba(255,255,255,0.35);
+    }
+    .list-check {
+      flex-shrink: 0;
+      width: 22px;
+      text-align: center;
+    }
+
+    .list-actions {
+      flex-shrink: 0;
+      padding: 14px 16px;
+      border-top: 1px solid #2a2a2a;
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .list-actions button {
+      width: 100%;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      min-height: 56px;
+    }
+    .list-actions .btn-primary { background: #0b6e2d; color: #fff; }
+    .list-actions .btn-secondary { background: #b45309; color: #fff; }
+
+    button {
+      background: #1f1f1f;
+      color: #fff;
+      border: 1px solid #555;
+      padding: 10px 18px;
+      border-radius: 8px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+      min-height: 44px;
+    }
+    button:active { background: #2a2a2a; transform: scale(0.97); }
+    button:disabled { opacity: 0.5; }
+
+    /* === Overlay de confirmation après scan === */
+    #confirm-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(10,10,10,0.97);
+      z-index: 200;
+      display: none;
+      flex-direction: column;
+      padding-top: max(20px, env(safe-area-inset-top));
+      padding-bottom: max(20px, env(safe-area-inset-bottom));
+      animation: fadeIn 0.15s ease-out;
+    }
+    #confirm-overlay.show { display: flex; }
+
+    .confirm-top {
+      flex-shrink: 0;
+      padding: 16px 24px 6px;
+      text-align: center;
+    }
+    .confirm-middle {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 20px;
+      min-height: 0;
+    }
+    .confirm-bottom {
+      flex-shrink: 0;
+      padding: 14px 20px 0;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; }
+      to { opacity: 1; }
+    }
+    @keyframes pop {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(1.15); }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    .confirm-icon {
+      width: 110px;
+      height: 110px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 68px;
+      font-weight: 900;
+      margin: 0 auto 18px;
+      animation: pop 0.35s ease-out;
+    }
+    .confirm-icon.success { background: #0b6e2d; color: #fff; }
+    .confirm-icon.warn { background: #92580d; color: #fff; }
+    .confirm-icon.error { background: #b91c1c; color: #fff; }
+    .confirm-icon.complete { background: #0b6e2d; color: #fff; font-size: 60px; }
+
+    .confirm-point {
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 1.25;
+      margin-bottom: 16px;
+      word-wrap: break-word;
+    }
+    .confirm-extra-note {
+      font-size: 15px;
+      font-weight: 600;
+      color: #fbbf24;
+      margin-bottom: 12px;
+    }
+
+    .confirm-status {
+      font-size: 17px;
+      font-weight: 700;
+      padding: 12px 18px;
+      border-radius: 10px;
+      margin: 0 auto 12px;
+      display: inline-flex;
+      align-items: center;
+      gap: 10px;
+      max-width: 100%;
+    }
+    .confirm-status.syncing { background: #1e3a8a; color: #cfe0ff; }
+    .confirm-status.synced { background: #0b6e2d; color: #fff; }
+    .confirm-status.pending { background: #92580d; color: #fff; }
+    .confirm-status.error { background: #b91c1c; color: #fff; }
+
+    .confirm-time {
+      color: #888;
+      font-size: 14px;
+    }
+
+    /* Liste des restantes */
+    .remaining-section {
+      margin-top: 20px;
+      padding-top: 16px;
+      border-top: 1px solid #2a2a2a;
+    }
+    .remaining-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: #fbbf24;
+      margin-bottom: 12px;
+      text-align: center;
+    }
+    .remaining-list {
+      list-style: none;
+      padding: 0;
+    }
+    .remaining-list li {
+      background: #1a1a1a;
+      border-left: 4px solid #fbbf24;
+      padding: 12px 14px;
+      margin-bottom: 8px;
+      border-radius: 6px;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
+    }
+
+    /* Section "Tournée terminée" */
+    .completed-section {
+      background: linear-gradient(135deg, #0b6e2d, #157a3a);
+      padding: 20px;
+      border-radius: 12px;
+      margin: 16px auto 0;
+      text-align: center;
+      animation: pop 0.45s ease-out;
+    }
+    .completed-title {
+      font-size: 26px;
+      font-weight: 800;
+      margin-bottom: 8px;
+    }
+    .completed-sub {
+      font-size: 16px;
+      color: #d6f5e0;
+    }
+
+    .confirm-bottom button {
+      width: 100%;
+      background: #0b6e2d;
+      color: #fff;
+      padding: 18px;
+      font-size: 19px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      min-height: 60px;
+    }
+    .confirm-bottom button.new-tour {
+      background: #b45309;
+    }
+
+    /* spinner */
+    .spinner {
+      width: 20px;
+      height: 20px;
+      border: 3px solid rgba(255,255,255,0.25);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* === Permission prompt initial === */
+    #permission-prompt {
+      position: absolute;
+      inset: 0;
+      background: rgba(0,0,0,0.95);
+      z-index: 100;
+      display: none;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 30px;
+      text-align: center;
+    }
+    #permission-prompt.show { display: flex; }
+    #permission-prompt h2 { font-size: 24px; margin-bottom: 14px; }
+    #permission-prompt p { font-size: 17px; line-height: 1.5; color: #ccc; margin-bottom: 28px; max-width: 380px; }
+    #permission-prompt button {
+      background: #0b6e2d;
+      padding: 18px 36px;
+      font-size: 19px;
+      font-weight: 700;
+      border: none;
+      min-height: 60px;
+      border-radius: 12px;
+    }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <header>
+      <h1>Tournée des Pastilles</h1>
+      <div class="status-bar">
+        <span id="pending-pill"></span>
+        <span id="status-text">…</span>
+        <span id="status-dot"></span>
+      </div>
+    </header>
+
+    <div id="reader">
+      <div class="tour-progress-banner" id="tour-progress-banner"></div>
+      <button class="open-list-btn" id="open-list-btn" aria-label="Voir la liste des pastilles">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span>Liste</span>
+      </button>
+      <div class="scan-overlay"></div>
+      <div class="scan-hint">Pointe la caméra sur la pastille</div>
+      <div class="version-tag">v11-killSW</div>
+    </div>
+
+    <!-- Vue Liste des pastilles -->
+    <div id="list-overlay">
+      <div class="list-header">
+        <h2>Liste des pastilles</h2>
+        <button class="list-close-x" id="list-close-x" aria-label="Fermer">✕</button>
+      </div>
+      <div class="list-progress">
+        <div class="list-progress-number" id="list-progress-number">0 / 19</div>
+        <div class="list-progress-label">pastilles scannées dans cette tournée</div>
+      </div>
+      <div class="list-body" id="list-body"></div>
+      <div class="list-actions">
+        <button class="btn-primary" id="list-back-btn">Retour à la caméra</button>
+        <button class="btn-secondary" id="list-reset-btn">Recommencer la tournée</button>
+      </div>
+    </div>
+
+    <!-- Overlay de confirmation après scan -->
+    <div id="confirm-overlay">
+      <div class="confirm-top">
+        <div class="confirm-icon success" id="confirm-icon">✓</div>
+        <div class="confirm-point" id="confirm-point">—</div>
+        <div class="confirm-extra-note" id="confirm-extra-note" style="display:none"></div>
+        <div class="confirm-status syncing" id="confirm-status">
+          <span class="spinner"></span>
+          <span>Envoi en cours…</span>
+        </div>
+        <div class="confirm-time" id="confirm-time"></div>
+      </div>
+      <div class="confirm-middle" id="confirm-middle"></div>
+      <div class="confirm-bottom">
+        <button id="confirm-next-btn">Scanner la prochaine</button>
+      </div>
+    </div>
+
+    <!-- Prompt de permission caméra au démarrage -->
+    <div id="permission-prompt">
+      <h2>Autoriser la caméra</h2>
+      <p>L'application a besoin d'accéder à la caméra pour scanner les pastilles QR.</p>
+      <button id="start-btn">Démarrer le scanner</button>
+    </div>
+  </div>
+
+  <script>
+    // Désinstalle tout Service Worker précédemment enregistré et vide les caches.
+    // On revient à du HTML pur servi directement par GitHub Pages — plus de cache emprisonné.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister().catch(() => {}));
+      }).catch(() => {});
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then((names) => names.forEach((n) => caches.delete(n))).catch(() => {});
+    }
+  </script>
+  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script>
+  (function() {
+    'use strict';
+
+    const APP_URL = 'https://script.google.com/macros/s/AKfycbz9arlNh79x5taFzUYcEIWVlAsGLQkoEtPfvJ0shukdnAnR64AKfMGJLpqb4R1kCltK/exec';
+    const SHARED_SECRET = 'tournee-pastilles-chr-2026';
+    const MULTI_FRAME_WINDOW_MS = 1500;
+    const SYNC_INTERVAL_MS = 30000;
+
+    // Pastilles attendues dans une tournée complète (extraites du document officiel)
+    const TOURNEE_POINTS = [
+      '1- Cases Transformation (Bas escalier)',
+      '2- Garage mécanique',
+      "3- Fournaise à l'huile Rabotage",
+      '4- Cabane à planure',
+      '5- Dépoussiéreur',
+      '6- Séchoir - Salle des machines 1-4',
+      '7- Bouilloire - Salle des machines',
+      '8- Séchoir - Salle des machines 5-6',
+      '9- Bureau du syndicat',
+      '10- Entrepôt A Compresseur',
+      '11- Garage rond',
+      '12- Réservoir à fuel diésel',
+      "13- Transformation - Fournaise à l'huile",
+      '14- Transformation - Compresseur à air',
+      '15- Transformation - Déchiqueteuse',
+      '16- Transformation - Bureau Autolog',
+      '17- Cabane du planeur 4',
+      '18- Cabane du planeur 1',
+      '19- Cabane du planeur 3'
+    ];
+    const TOURNEE_STORAGE_KEY = 'tournee-scanned-v1';
+
+    const ui = {
+      reader: document.getElementById('reader'),
+      statusDot: document.getElementById('status-dot'),
+      statusText: document.getElementById('status-text'),
+      pendingPill: document.getElementById('pending-pill'),
+      permPrompt: document.getElementById('permission-prompt'),
+      startBtn: document.getElementById('start-btn'),
+      tourProgressBanner: document.getElementById('tour-progress-banner'),
+      openListBtn: document.getElementById('open-list-btn'),
+      listOverlay: document.getElementById('list-overlay'),
+      listCloseX: document.getElementById('list-close-x'),
+      listProgressNumber: document.getElementById('list-progress-number'),
+      listBody: document.getElementById('list-body'),
+      listBackBtn: document.getElementById('list-back-btn'),
+      listResetBtn: document.getElementById('list-reset-btn'),
+      confirmOverlay: document.getElementById('confirm-overlay'),
+      confirmIcon: document.getElementById('confirm-icon'),
+      confirmPoint: document.getElementById('confirm-point'),
+      confirmExtraNote: document.getElementById('confirm-extra-note'),
+      confirmStatus: document.getElementById('confirm-status'),
+      confirmTime: document.getElementById('confirm-time'),
+      confirmMiddle: document.getElementById('confirm-middle'),
+      confirmNextBtn: document.getElementById('confirm-next-btn'),
+    };
+
+    let scanner = null;
+    let isSyncing = false;
+    let lastFrameByPoint = new Map();
+    let overlayOpen = false;
+    let currentTourComplete = false;
+
+    // === Tournée (localStorage) ===
+    function getScannedTour() {
+      try {
+        const raw = localStorage.getItem(TOURNEE_STORAGE_KEY);
+        return new Set(raw ? JSON.parse(raw) : []);
+      } catch { return new Set(); }
+    }
+    function setScannedTour(set) {
+      try { localStorage.setItem(TOURNEE_STORAGE_KEY, JSON.stringify(Array.from(set))); } catch {}
+    }
+    function resetTour() {
+      try { localStorage.removeItem(TOURNEE_STORAGE_KEY); } catch {}
+    }
+    function getRemainingTour() {
+      const scanned = getScannedTour();
+      return TOURNEE_POINTS.filter(p => !scanned.has(p));
+    }
+    function updateTourBanner() {
+      const remaining = getRemainingTour();
+      const total = TOURNEE_POINTS.length;
+      const done = total - remaining.length;
+      if (done === 0) {
+        ui.tourProgressBanner.textContent = total + ' pastilles à scanner';
+        ui.tourProgressBanner.className = 'tour-progress-banner';
+      } else if (remaining.length === 0) {
+        ui.tourProgressBanner.textContent = '✓ Tournée terminée';
+        ui.tourProgressBanner.className = 'tour-progress-banner complete';
+      } else {
+        ui.tourProgressBanner.textContent = done + '/' + total + ' scannées';
+        ui.tourProgressBanner.className = 'tour-progress-banner';
+      }
+    }
+
+    // === IndexedDB ===
+    const DB_NAME = 'scan-pastilles-db';
+    const STORE = 'pending';
+    function openDB() {
+      return new Promise((resolve, reject) => {
+        const req = indexedDB.open(DB_NAME, 1);
+        req.onupgradeneeded = () => {
+          const db = req.result;
+          if (!db.objectStoreNames.contains(STORE)) {
+            db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+          }
+        };
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function dbAdd(scan) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const req = tx.objectStore(STORE).add(scan);
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function dbGetAll() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).getAll();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+    async function dbDelete(ids) {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readwrite');
+        const store = tx.objectStore(STORE);
+        ids.forEach(id => store.delete(id));
+        tx.oncomplete = () => resolve();
+        tx.onerror = () => reject(tx.error);
+      });
+    }
+    async function dbCount() {
+      const db = await openDB();
+      return new Promise((resolve, reject) => {
+        const tx = db.transaction(STORE, 'readonly');
+        const req = tx.objectStore(STORE).count();
+        req.onsuccess = () => resolve(req.result);
+        req.onerror = () => reject(req.error);
+      });
+    }
+
+    // === Feedback ===
+    function vibrate(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
+
+    let audioCtx = null;
+    function beep(freq, duration) {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.connect(gain); gain.connect(audioCtx.destination);
+        osc.frequency.value = freq; osc.type = 'sine';
+        gain.gain.setValueAtTime(0.22, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.start(); osc.stop(audioCtx.currentTime + duration);
+      } catch (e) {}
+    }
+
+    async function updatePendingBadge() {
+      const n = await dbCount();
+      if (n === 0) {
+        ui.pendingPill.className = '';
+        ui.pendingPill.textContent = '';
+      } else {
+        ui.pendingPill.className = 'visible';
+        ui.pendingPill.textContent = n + ' en attente';
+      }
+      return n;
+    }
+    function setOnlineStatus(online) {
+      ui.statusDot.className = online ? 'online' : 'offline';
+      ui.statusText.textContent = online ? 'En ligne' : 'Hors ligne';
+    }
+
+    // === Confirm overlay ===
+    function renderRemainingList(remaining) {
+      if (remaining.length === 0) return '';
+      const items = remaining.map(p => '<li>' + escapeHtml(p) + '</li>').join('');
+      return '<div class="remaining-section">'
+           + '<div class="remaining-title">Pastilles restantes (' + remaining.length + ')</div>'
+           + '<ul class="remaining-list">' + items + '</ul>'
+           + '</div>';
+    }
+    function escapeHtml(s) {
+      return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+    }
+
+    function showConfirmOverlay(point, ts, info) {
+      overlayOpen = true;
+      info = info || {};
+
+      // Icône et notes
+      if (info.isComplete) {
+        ui.confirmIcon.className = 'confirm-icon complete';
+        ui.confirmIcon.textContent = '✓';
+      } else if (info.wasAlready) {
+        ui.confirmIcon.className = 'confirm-icon warn';
+        ui.confirmIcon.textContent = '!';
+      } else if (info.isUnknown) {
+        ui.confirmIcon.className = 'confirm-icon warn';
+        ui.confirmIcon.textContent = '?';
+      } else {
+        ui.confirmIcon.className = 'confirm-icon success';
+        ui.confirmIcon.textContent = '✓';
+      }
+
+      ui.confirmPoint.textContent = point;
+
+      // Note extra
+      if (info.wasAlready && !info.isComplete) {
+        ui.confirmExtraNote.style.display = 'block';
+        ui.confirmExtraNote.textContent = '⚠ Pastille déjà scannée dans cette tournée';
+      } else if (info.isUnknown) {
+        ui.confirmExtraNote.style.display = 'block';
+        ui.confirmExtraNote.textContent = '⚠ Pastille hors de la liste de tournée';
+      } else {
+        ui.confirmExtraNote.style.display = 'none';
+      }
+
+      // Sync status (commence en "envoi en cours")
+      ui.confirmStatus.className = 'confirm-status syncing';
+      ui.confirmStatus.innerHTML = '<span class="spinner"></span><span>Envoi en cours…</span>';
+
+      const d = new Date(ts);
+      ui.confirmTime.textContent = 'Scanné à ' + d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+      // Middle : soit "Tournée terminée" soit liste des restantes
+      if (info.isComplete) {
+        ui.confirmMiddle.innerHTML =
+          '<div class="completed-section">'
+          + '<div class="completed-title">Tournée terminée</div>'
+          + '<div class="completed-sub">Les ' + TOURNEE_POINTS.length + ' pastilles ont été scannées.</div>'
+          + '</div>';
+        ui.confirmNextBtn.textContent = 'Nouvelle tournée';
+        ui.confirmNextBtn.className = 'new-tour';
+        currentTourComplete = true;
+      } else {
+        ui.confirmMiddle.innerHTML = renderRemainingList(info.remaining || []);
+        ui.confirmNextBtn.textContent = 'Scanner la prochaine';
+        ui.confirmNextBtn.className = '';
+        currentTourComplete = false;
+      }
+
+      ui.confirmOverlay.classList.add('show');
+    }
+    function setConfirmStatusSynced() {
+      ui.confirmStatus.className = 'confirm-status synced';
+      ui.confirmStatus.innerHTML = '<span style="font-size:22px">✓</span><span>Enregistré</span>';
+    }
+    function setConfirmStatusPending(n) {
+      ui.confirmStatus.className = 'confirm-status pending';
+      ui.confirmStatus.innerHTML = '<span style="font-size:22px">💾</span><span>Sauvegardé · sera envoyé au retour du signal' + (n > 1 ? ' (' + n + ' en attente)' : '') + '</span>';
+    }
+    function setConfirmStatusError(msg) {
+      ui.confirmStatus.className = 'confirm-status error';
+      ui.confirmStatus.innerHTML = '<span style="font-size:22px">⚠</span><span>' + escapeHtml(msg) + '</span>';
+    }
+    async function closeConfirmOverlay() {
+      if (currentTourComplete) {
+        // Reset la tournée et rafraîchit le bandeau
+        resetTour();
+        currentTourComplete = false;
+        updateTourBanner();
+      }
+      ui.confirmOverlay.classList.remove('show');
+      overlayOpen = false;
+      lastFrameByPoint.clear();
+      if (scanner) {
+        try { await scanner.resume(); } catch (e) {}
+      }
+    }
+
+    // === Vue Liste ===
+    function renderListView() {
+      const scanned = getScannedTour();
+      const remaining = TOURNEE_POINTS.filter(p => !scanned.has(p));
+      const done = TOURNEE_POINTS.filter(p => scanned.has(p));
+      ui.listProgressNumber.textContent = done.length + ' / ' + TOURNEE_POINTS.length;
+
+      let html = '';
+      if (remaining.length > 0) {
+        html += '<div class="list-section-title remaining">À scanner (' + remaining.length + ')</div>';
+        html += '<ul class="list-points">';
+        remaining.forEach(p => {
+          html += '<li class="remaining"><span class="list-check">○</span><span>' + escapeHtml(p) + '</span></li>';
+        });
+        html += '</ul>';
+      }
+      if (done.length > 0) {
+        html += '<div class="list-section-title done">Déjà scannées (' + done.length + ')</div>';
+        html += '<ul class="list-points">';
+        done.forEach(p => {
+          html += '<li class="done"><span class="list-check">✓</span><span>' + escapeHtml(p) + '</span></li>';
+        });
+        html += '</ul>';
+      }
+      ui.listBody.innerHTML = html;
+    }
+    function openListView() {
+      renderListView();
+      ui.listOverlay.classList.add('show');
+    }
+    function closeListView() {
+      ui.listOverlay.classList.remove('show');
+    }
+
+    // === Scan handling ===
+    async function handleScan(decoded) {
+      if (overlayOpen) return;
+
+      const now = Date.now();
+      const last = lastFrameByPoint.get(decoded) || 0;
+      if (now - last < MULTI_FRAME_WINDOW_MS) return;
+      lastFrameByPoint.set(decoded, now);
+
+      if (scanner) {
+        try { await scanner.pause(true); } catch (e) {}
+      }
+      vibrate([180, 80, 120]);
+      beep(880, 0.14);
+
+      const scan = { ts: new Date(now).toISOString(), point: decoded };
+      try {
+        await dbAdd(scan);
+      } catch (e) {
+        showConfirmOverlay(decoded, now, {});
+        setConfirmStatusError('Erreur stockage local');
+        return;
+      }
+
+      // Tracking tournée
+      const scanned = getScannedTour();
+      const isInList = TOURNEE_POINTS.includes(decoded);
+      const wasAlready = scanned.has(decoded);
+      if (isInList && !wasAlready) {
+        scanned.add(decoded);
+        setScannedTour(scanned);
+      }
+      const remaining = TOURNEE_POINTS.filter(p => !scanned.has(p));
+      const isComplete = isInList && remaining.length === 0;
+
+      showConfirmOverlay(decoded, now, {
+        isInList,
+        isUnknown: !isInList,
+        wasAlready,
+        remaining,
+        isComplete
+      });
+      updateTourBanner();
+      await updatePendingBadge();
+
+      // Sync
+      const result = await flushPending();
+      const pendingCount = await updatePendingBadge();
+      if (result === 'synced') {
+        setConfirmStatusSynced();
+        beep(1320, 0.1);
+      } else {
+        setConfirmStatusPending(pendingCount);
+      }
+    }
+
+    // === Sync ===
+    async function flushPending() {
+      if (isSyncing) return 'noop';
+      const items = await dbGetAll();
+      if (items.length === 0) return 'noop';
+      if (!navigator.onLine) {
+        setOnlineStatus(false);
+        return 'offline';
+      }
+      isSyncing = true;
+      try {
+        const body = JSON.stringify({
+          secret: SHARED_SECRET,
+          scans: items.map(i => ({ ts: i.ts, point: i.point }))
+        });
+        const resp = await fetch(APP_URL, {
+          method: 'POST',
+          body: body,
+          redirect: 'follow',
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        });
+        if (!resp.ok) throw new Error('HTTP ' + resp.status);
+        const data = await resp.json();
+        if (!data.ok) throw new Error(data.error || 'unknown');
+        await dbDelete(items.map(i => i.id));
+        setOnlineStatus(true);
+        return 'synced';
+      } catch (err) {
+        setOnlineStatus(false);
+        console.warn('Sync failed:', err);
+        return 'offline';
+      } finally {
+        isSyncing = false;
+      }
+    }
+
+    // === Scanner ===
+    async function startScanner() {
+      ui.permPrompt.classList.remove('show');
+      try {
+        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
+        scanner = new Html5Qrcode('reader', { verbose: false });
+        const config = {
+          fps: 10,
+          qrbox: (w, h) => {
+            const min = Math.min(w, h);
+            const size = Math.floor(min * 0.7);
+            return { width: size, height: size };
+          },
+          aspectRatio: window.innerWidth / (window.innerHeight - 180),
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
+        };
+        await scanner.start(
+          { facingMode: 'environment' },
+          config,
+          (decoded) => handleScan(decoded),
+          () => {}
+        );
+      } catch (err) {
+        ui.permPrompt.classList.add('show');
+        ui.permPrompt.querySelector('p').textContent =
+          'Impossible d\'accéder à la caméra : ' + (err.message || err);
+      }
+    }
+
+    // === Boot ===
+    async function boot() {
+      await updatePendingBadge();
+      setOnlineStatus(navigator.onLine);
+      updateTourBanner();
+
+      ui.startBtn.addEventListener('click', startScanner);
+      ui.confirmNextBtn.addEventListener('click', closeConfirmOverlay);
+      ui.openListBtn.addEventListener('click', openListView);
+      ui.listCloseX.addEventListener('click', closeListView);
+      ui.listBackBtn.addEventListener('click', closeListView);
+      ui.listResetBtn.addEventListener('click', () => {
+        const done = TOURNEE_POINTS.length - getRemainingTour().length;
+        const msg = done === 0
+          ? 'Recommencer la tournée ?'
+          : 'Recommencer la tournée ? Les ' + done + ' pastilles déjà cochées seront effacées de la tournée en cours.';
+        if (confirm(msg)) {
+          resetTour();
+          updateTourBanner();
+          renderListView();
+        }
+      });
+
+      window.addEventListener('online', () => {
+        setOnlineStatus(true);
+        flushPending().then(() => updatePendingBadge());
+      });
+      window.addEventListener('offline', () => setOnlineStatus(false));
+
+      setInterval(() => {
+        if (navigator.onLine && !overlayOpen) {
+          flushPending().then(() => updatePendingBadge());
+        }
+      }, SYNC_INTERVAL_MS);
+
+      flushPending().then(() => updatePendingBadge());
+
+      // Si la permission caméra a déjà été accordée, démarrer le scanner sans prompt.
+      let cameraGranted = false;
+      if (navigator.permissions && navigator.permissions.query) {
+        try {
+          const status = await navigator.permissions.query({ name: 'camera' });
+          cameraGranted = (status.state === 'granted');
+        } catch (e) { /* certains navigateurs ne supportent pas 'camera' ici */ }
+      }
+      if (cameraGranted) {
+        startScanner();
+      } else {
+        ui.permPrompt.classList.add('show');
+      }
+    }
+
+    boot();
+  })();
+  </script>
+</body>
+</html>
