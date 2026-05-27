@@ -146,27 +146,146 @@
       background: rgba(11, 110, 45, 0.95);
     }
 
-    .reset-tour-btn {
+    .open-list-btn {
       position: absolute;
       top: 12px;
       right: 12px;
-      width: 42px;
       height: 42px;
-      border-radius: 50%;
-      background: rgba(0,0,0,0.55);
+      padding: 0 16px;
+      border-radius: 999px;
+      background: rgba(0,0,0,0.6);
       border: 1.5px solid rgba(255,255,255,0.5);
       color: #fff;
-      font-size: 22px;
+      font-size: 15px;
       font-weight: 700;
       z-index: 7;
-      padding: 0;
       min-height: 42px;
-      display: flex;
+      display: inline-flex;
       align-items: center;
-      justify-content: center;
+      gap: 8px;
       cursor: pointer;
     }
-    .reset-tour-btn:active { background: rgba(0,0,0,0.75); }
+    .open-list-btn:active { background: rgba(0,0,0,0.85); }
+    .open-list-btn svg { width: 20px; height: 20px; }
+
+    /* === Vue Liste === */
+    #list-overlay {
+      position: fixed;
+      inset: 0;
+      background: #0a0a0a;
+      z-index: 150;
+      display: none;
+      flex-direction: column;
+      padding-top: max(0px, env(safe-area-inset-top));
+      padding-bottom: max(0px, env(safe-area-inset-bottom));
+    }
+    #list-overlay.show { display: flex; }
+
+    .list-header {
+      background: #0b6e2d;
+      padding: 16px 18px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      flex-shrink: 0;
+    }
+    .list-header h2 {
+      font-size: 20px;
+      font-weight: 700;
+      flex: 1;
+    }
+    .list-close-x {
+      background: transparent;
+      border: none;
+      color: #fff;
+      font-size: 26px;
+      padding: 4px 8px;
+      cursor: pointer;
+      min-height: auto;
+    }
+
+    .list-progress {
+      padding: 18px 20px 8px;
+      text-align: center;
+    }
+    .list-progress-number {
+      font-size: 28px;
+      font-weight: 800;
+    }
+    .list-progress-label {
+      font-size: 14px;
+      color: #888;
+      margin-top: 2px;
+    }
+
+    .list-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 6px 16px 16px;
+    }
+
+    .list-section-title {
+      font-size: 15px;
+      font-weight: 700;
+      color: #888;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      margin: 18px 4px 10px;
+    }
+    .list-section-title.remaining { color: #fbbf24; }
+    .list-section-title.done { color: #4ade80; }
+
+    .list-points {
+      list-style: none;
+      padding: 0;
+    }
+    .list-points li {
+      padding: 14px 14px;
+      margin-bottom: 6px;
+      border-radius: 8px;
+      font-size: 16px;
+      font-weight: 600;
+      line-height: 1.3;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .list-points li.remaining {
+      background: #1a1a1a;
+      border-left: 4px solid #fbbf24;
+    }
+    .list-points li.done {
+      background: #1a2920;
+      color: #9fd6b3;
+      text-decoration: line-through;
+      text-decoration-color: rgba(255,255,255,0.35);
+    }
+    .list-check {
+      flex-shrink: 0;
+      width: 22px;
+      text-align: center;
+    }
+
+    .list-actions {
+      flex-shrink: 0;
+      padding: 14px 16px;
+      border-top: 1px solid #2a2a2a;
+      background: #111;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    .list-actions button {
+      width: 100%;
+      padding: 16px;
+      font-size: 17px;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      min-height: 56px;
+    }
+    .list-actions .btn-primary { background: #0b6e2d; color: #fff; }
+    .list-actions .btn-secondary { background: #b45309; color: #fff; }
 
     button {
       background: #1f1f1f;
@@ -388,9 +507,29 @@
 
     <div id="reader">
       <div class="tour-progress-banner" id="tour-progress-banner"></div>
-      <button class="reset-tour-btn" id="reset-tour-btn" aria-label="Recommencer la tournée" title="Recommencer la tournée">↻</button>
+      <button class="open-list-btn" id="open-list-btn" aria-label="Voir la liste des pastilles">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+        <span>Liste</span>
+      </button>
       <div class="scan-overlay"></div>
       <div class="scan-hint">Pointe la caméra sur la pastille</div>
+    </div>
+
+    <!-- Vue Liste des pastilles -->
+    <div id="list-overlay">
+      <div class="list-header">
+        <h2>Liste des pastilles</h2>
+        <button class="list-close-x" id="list-close-x" aria-label="Fermer">✕</button>
+      </div>
+      <div class="list-progress">
+        <div class="list-progress-number" id="list-progress-number">0 / 19</div>
+        <div class="list-progress-label">pastilles scannées dans cette tournée</div>
+      </div>
+      <div class="list-body" id="list-body"></div>
+      <div class="list-actions">
+        <button class="btn-primary" id="list-back-btn">Retour à la caméra</button>
+        <button class="btn-secondary" id="list-reset-btn">Recommencer la tournée</button>
+      </div>
     </div>
 
     <!-- Overlay de confirmation après scan -->
@@ -461,7 +600,13 @@
       permPrompt: document.getElementById('permission-prompt'),
       startBtn: document.getElementById('start-btn'),
       tourProgressBanner: document.getElementById('tour-progress-banner'),
-      resetTourBtn: document.getElementById('reset-tour-btn'),
+      openListBtn: document.getElementById('open-list-btn'),
+      listOverlay: document.getElementById('list-overlay'),
+      listCloseX: document.getElementById('list-close-x'),
+      listProgressNumber: document.getElementById('list-progress-number'),
+      listBody: document.getElementById('list-body'),
+      listBackBtn: document.getElementById('list-back-btn'),
+      listResetBtn: document.getElementById('list-reset-btn'),
       confirmOverlay: document.getElementById('confirm-overlay'),
       confirmIcon: document.getElementById('confirm-icon'),
       confirmPoint: document.getElementById('confirm-point'),
@@ -697,6 +842,40 @@
       }
     }
 
+    // === Vue Liste ===
+    function renderListView() {
+      const scanned = getScannedTour();
+      const remaining = TOURNEE_POINTS.filter(p => !scanned.has(p));
+      const done = TOURNEE_POINTS.filter(p => scanned.has(p));
+      ui.listProgressNumber.textContent = done.length + ' / ' + TOURNEE_POINTS.length;
+
+      let html = '';
+      if (remaining.length > 0) {
+        html += '<div class="list-section-title remaining">À scanner (' + remaining.length + ')</div>';
+        html += '<ul class="list-points">';
+        remaining.forEach(p => {
+          html += '<li class="remaining"><span class="list-check">○</span><span>' + escapeHtml(p) + '</span></li>';
+        });
+        html += '</ul>';
+      }
+      if (done.length > 0) {
+        html += '<div class="list-section-title done">Déjà scannées (' + done.length + ')</div>';
+        html += '<ul class="list-points">';
+        done.forEach(p => {
+          html += '<li class="done"><span class="list-check">✓</span><span>' + escapeHtml(p) + '</span></li>';
+        });
+        html += '</ul>';
+      }
+      ui.listBody.innerHTML = html;
+    }
+    function openListView() {
+      renderListView();
+      ui.listOverlay.classList.add('show');
+    }
+    function closeListView() {
+      ui.listOverlay.classList.remove('show');
+    }
+
     // === Scan handling ===
     async function handleScan(decoded) {
       if (overlayOpen) return;
@@ -826,7 +1005,10 @@
 
       ui.startBtn.addEventListener('click', startScanner);
       ui.confirmNextBtn.addEventListener('click', closeConfirmOverlay);
-      ui.resetTourBtn.addEventListener('click', () => {
+      ui.openListBtn.addEventListener('click', openListView);
+      ui.listCloseX.addEventListener('click', closeListView);
+      ui.listBackBtn.addEventListener('click', closeListView);
+      ui.listResetBtn.addEventListener('click', () => {
         const done = TOURNEE_POINTS.length - getRemainingTour().length;
         const msg = done === 0
           ? 'Recommencer la tournée ?'
@@ -834,6 +1016,7 @@
         if (confirm(msg)) {
           resetTour();
           updateTourBanner();
+          renderListView();
         }
       });
 
