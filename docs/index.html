@@ -561,6 +561,15 @@
     </div>
   </div>
 
+  <script>
+    // Enregistre le Service Worker au plus tôt pour garantir que les futures
+    // mises à jour soient récupérées automatiquement.
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW register failed', e));
+      });
+    }
+  </script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
   <script>
   (function() {
