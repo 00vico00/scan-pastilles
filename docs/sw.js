@@ -1,72 +1,38 @@
-// Service Worker — stratégie network-first pour la page HTML et passthrough pour le reste.
-// Objectif : les opérateurs reçoivent automatiquement la dernière version sans avoir à vider le cache.
-
-const CACHE_NAME = 'scan-pastilles-shell';
-const SHELL_URLS = ['./', './index.html'];
+// === KILL SWITCH ===
+// Ce SW remplace l'ancien SW qui servait du contenu cached obsolète.
+// Quand Chrome fetch ce sw.js et installe la nouvelle version, l'activate ci-dessous :
+// 1) vide TOUS les caches stockés par le SW
+// 2) désinstalle le SW lui-même
+// 3) recharge toutes les pages ouvertes pour servir le HTML frais depuis le réseau
 
 self.addEventListener('install', (event) => {
   self.skipWaiting();
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS).catch(() => {}))
-  );
 });
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(
-    Promise.all([
-      // Nettoyer les anciens caches au cas où le nom change un jour
-      caches.keys().then((names) =>
-        Promise.all(names.filter((n) => n !== CACHE_NAME).map((n) => caches.delete(n)))
-      ),
-      self.clients.claim(),
-    ])
-  );
+  event.waitUntil((async () => {
+    try {
+      // 1. Vider absolument tous les caches
+      const names = await caches.keys();
+      await Promise.all(names.map((n) => caches.delete(n)));
+    } catch (e) { /* ignore */ }
+
+    try {
+      // 2. Forcer le reload de toutes les pages contrôlées par ce SW
+      const allClients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+      for (const client of allClients) {
+        try { await client.navigate(client.url); } catch (e) { /* ignore */ }
+      }
+    } catch (e) { /* ignore */ }
+
+    try {
+      // 3. Se désinstaller pour ne plus jamais intercepter
+      await self.registration.unregister();
+    } catch (e) { /* ignore */ }
+  })());
 });
 
+// Passthrough — ne plus servir de cache pour aucune requête
 self.addEventListener('fetch', (event) => {
-  const req = event.request;
-  if (req.method !== 'GET') return;
-
-  const url = new URL(req.url);
-
-  // 1) Requêtes vers Apps Script (POST sync) — laisser passer, ne pas toucher.
-  if (url.hostname.endsWith('script.google.com') || url.hostname.endsWith('script.googleusercontent.com')) {
-    return;
-  }
-
-  // 2) Page HTML (navigation) → network-first, fallback cache si offline.
-  const isNavigation = req.mode === 'navigate' ||
-    (req.destination === 'document') ||
-    url.pathname.endsWith('/') ||
-    url.pathname.endsWith('/index.html');
-
-  if (isNavigation && url.origin === self.location.origin) {
-    event.respondWith(
-      fetch(req)
-        .then((resp) => {
-          // Met à jour le cache avec la dernière version reçue
-          const respClone = resp.clone();
-          caches.open(CACHE_NAME).then((c) => c.put('./index.html', respClone).catch(() => {}));
-          return resp;
-        })
-        .catch(() => caches.match('./index.html').then((r) => r || caches.match('./')))
-    );
-    return;
-  }
-
-  // 3) Tout le reste (CDN unpkg, fonts, etc.) → cache-first, mais on tolère l'échec.
-  event.respondWith(
-    caches.match(req).then((cached) => {
-      if (cached) return cached;
-      return fetch(req)
-        .then((resp) => {
-          if (resp && resp.status === 200 && (resp.type === 'basic' || resp.type === 'cors')) {
-            const respClone = resp.clone();
-            caches.open(CACHE_NAME).then((c) => c.put(req, respClone).catch(() => {}));
-          }
-          return resp;
-        })
-        .catch(() => cached);
-    })
-  );
+  // ne rien faire, laisser le browser fetch normalement
 });

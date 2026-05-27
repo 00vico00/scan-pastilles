@@ -531,7 +531,7 @@
       </button>
       <div class="scan-overlay"></div>
       <div class="scan-hint">Pointe la caméra sur la pastille</div>
-      <div class="version-tag">v10</div>
+      <div class="version-tag">v11-killSW</div>
     </div>
 
     <!-- Vue Liste des pastilles -->
@@ -578,12 +578,15 @@
   </div>
 
   <script>
-    // Enregistre le Service Worker au plus tôt pour garantir que les futures
-    // mises à jour soient récupérées automatiquement.
+    // Désinstalle tout Service Worker précédemment enregistré et vide les caches.
+    // On revient à du HTML pur servi directement par GitHub Pages — plus de cache emprisonné.
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js').catch((e) => console.warn('SW register failed', e));
-      });
+      navigator.serviceWorker.getRegistrations().then((regs) => {
+        regs.forEach((r) => r.unregister().catch(() => {}));
+      }).catch(() => {});
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then((names) => names.forEach((n) => caches.delete(n))).catch(() => {});
     }
   </script>
   <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
