@@ -4,7 +4,7 @@ PWA de scan QR pour la tournée des pastilles SST, Domtar Château-Richer.
 
 ## Architecture
 
-- **Frontend** : [web/index.html](web/index.html) — hébergé sur GitHub Pages
+- **Frontend** : [docs/index.html](docs/index.html) — hébergé sur GitHub Pages
 - **Backend** : [apps-script/Code.gs](apps-script/Code.gs) — déployé sur Google Apps Script, écrit dans le Google Sheets « Tournée des Pastilles »
 
 ## Fonctionnement

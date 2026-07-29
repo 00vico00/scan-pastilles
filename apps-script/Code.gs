@@ -3,18 +3,20 @@
  * Backend Apps Script attaché au Google Sheets existant.
  *
  * Endpoints:
- *   GET  → sert la PWA (page de scan)
+ *   GET  → redirige vers l'app sur GitHub Pages (l'app ne vit plus ici :
+ *          l'iframe HtmlService bloque l'accès caméra)
  *   POST → reçoit un lot de scans { scans: [{ts, point}, ...] } et les append
  */
 
 const SHARED_SECRET = 'tournee-pastilles-chr-2026';
+const APP_URL = 'https://00vico00.github.io/scan-pastilles/';
 
 function doGet(e) {
-  return HtmlService.createTemplateFromFile('Index')
-    .evaluate()
-    .setTitle('Tournée des Pastilles')
-    .addMetaTag('viewport', 'width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no')
-    .setXFrameOptionsMode(HtmlService.XFrameOptionsMode.ALLOWALL);
+  return HtmlService.createHtmlOutput(
+    '<p style="font-family:sans-serif;padding:24px">L\'app de scan a déménagé : '
+    + '<a href="' + APP_URL + '" target="_top">' + APP_URL + '</a></p>'
+    + '<script>try { window.top.location.href = "' + APP_URL + '"; } catch (e) {}</script>'
+  ).setTitle('Tournée des Pastilles');
 }
 
 function doPost(e) {
