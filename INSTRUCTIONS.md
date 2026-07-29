@@ -46,7 +46,7 @@ Si le téléphone perd le signal (zones mortes de l'usine) :
 | Composant | Rôle | Hébergement |
 |---|---|---|
 | **Frontend** (PWA scan) | App de scan dans le navigateur | GitHub Pages — repo public [00vico00/scan-pastilles](https://github.com/00vico00/scan-pastilles), dossier `docs/` |
-| **Backend** (`Code.gs`) | Endpoint POST qui ajoute les lignes au Sheets | Google Apps Script attaché au Sheets de la tournée |
+| **Backend** (`Code.gs`) | Endpoint POST qui ajoute les lignes au Sheets (verrou `LockService` : les écritures simultanées de deux téléphones sont sérialisées). Un GET sur l'URL redirige vers l'app GitHub Pages | Google Apps Script attaché au Sheets de la tournée |
 | **Données** | Historique des scans (date, point, 1) | Google Sheets dans le Drive du compte `sechoirpfrcr@gmail.com` |
 
 Le frontend envoie un POST cross-origin vers l'URL Apps Script avec un secret partagé. Le backend valide le secret et écrit les lignes.
@@ -98,3 +98,5 @@ Codée en dur dans `docs/index.html`. Pour ajouter/retirer une pastille, modifie
 | QR jamais détecté | Nettoyer la pastille · plus de lumière · approcher/éloigner le téléphone |
 | Pastille toujours « hors liste » | Le texte du QR ne matche pas exactement un nom dans `TOURNEE_POINTS` (souvent une apostrophe droite `'` vs courbe `'`) — éditer la constante pour matcher le QR réel |
 | Doublons rapides dans le Sheets | Augmenter `MULTI_FRAME_WINDOW_MS` dans `docs/index.html` (actuellement 1500 ms) |
+| Lignes suspectes dans le Sheets (pas venues d'une tournée) | Quelqu'un a trouvé le secret partagé (il est forcément public : repo + code source de la page). Changer le secret dans `apps-script/Code.gs` **et** `docs/index.html`, puis redéployer les deux (workflows ci-dessus) |
+| Sync qui répond `busy` | Normal si deux téléphones synchronisent au même instant (verrou 30 s côté backend). Les scans restent en attente sur le téléphone et repartent au prochain essai — rien à faire |
