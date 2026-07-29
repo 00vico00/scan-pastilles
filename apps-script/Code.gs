@@ -36,15 +36,26 @@ function doPost(e) {
       return respond({ ok: true, added: 0 });
     }
 
-    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
-    const rows = scans.map(s => [new Date(s.ts), String(s.point), 1]);
+    // Sérialise les écritures : deux téléphones qui synchronisent en même temps
+    // liraient le même getLastRow() et s'écraseraient mutuellement des lignes.
+    const lock = LockService.getScriptLock();
+    if (!lock.tryLock(30 * 1000)) {
+      return respond({ ok: false, error: 'busy' });
+    }
 
-    const startRow = sheet.getLastRow() + 1;
-    sheet.getRange(startRow, 1, rows.length, 3).setValues(rows);
+    try {
+      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+      const rows = scans.map(s => [new Date(s.ts), String(s.point), 1]);
 
-    sheet.getRange(startRow, 1, rows.length, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+      const startRow = sheet.getLastRow() + 1;
+      sheet.getRange(startRow, 1, rows.length, 3).setValues(rows);
 
-    return respond({ ok: true, added: rows.length });
+      sheet.getRange(startRow, 1, rows.length, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+
+      return respond({ ok: true, added: rows.length });
+    } finally {
+      lock.releaseLock();
+    }
   } catch (err) {
     return respond({ ok: false, error: err.toString() });
   }
