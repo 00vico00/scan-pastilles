@@ -6,6 +6,10 @@
  *   GET  → redirige vers l'app sur GitHub Pages (l'app ne vit plus ici :
  *          l'iframe HtmlService bloque l'accès caméra)
  *   POST → reçoit un lot de scans { scans: [{ts, point}, ...] } et les append
+ *
+ * Rapport quotidien : rapportTournee() (déclencheur horaire, ~6 h 30) évalue
+ * les quarts écoulés et envoie le verdict par courriel — voir la section
+ * « Rapport quotidien de tournée » en bas de fichier.
  */
 
 const SHARED_SECRET = 'tournee-pastilles-chr-2026';
@@ -109,4 +113,221 @@ function testWrite() {
   };
   const result = doPost(fakeEvent);
   Logger.log(result.getContent());
+}
+
+// ====================================================================
+// Rapport quotidien de tournée
+// ====================================================================
+// La tournée prouve que la surveillance incendie a été faite par
+// l'opérateur présent quand l'usine est fermée. Quarts évalués :
+//   nuit = 18 h → 6 h (toutes les nuits)
+//   jour = 6 h → 18 h (samedi et dimanche seulement)
+// Le rapport du matin (déclencheur ~6 h 30) couvre les quarts écoulés
+// depuis le rapport précédent : 1 fenêtre en semaine, 2 les dimanche
+// et lundi matin. Il part TOUJOURS (trace quotidienne : l'absence de
+// courriel est elle-même un signal de panne).
+//
+// Destinataires : Script Property RAPPORT_DESTINATAIRES (adresses
+// séparées par des virgules) — jamais dans le code, le dépôt est public.
+
+// Doit rester identique à TOURNEE_POINTS dans docs/index.html
+// (le texte des QR fait foi).
+const POINTS_ATTENDUS = [
+  '1- Cases Transformation (Bas escalier)',
+  '2- Garage mécanique',
+  "3- Fournaise à l'huile Rabotage",
+  '4- Cabane à planure',
+  '5- Dépoussiéreur',
+  '6- Séchoir - Salle des machines 1-4',
+  '7- Bouilloire - Salle des machines',
+  '8- Séchoir - Salle des machines 5-6',
+  '9- Bureau du syndicat',
+  '10- Entrepôt A Compresseur',
+  '11- Garage rond',
+  '12- Réservoir à fuel diésel',
+  "13- Transformation - Fournaise à l'huile",
+  '14- Transformation - Compresseur à air',
+  '15- Transformation - Déchiqueteuse',
+  '16- Transformation - Bureau Autolog',
+  '17- Cabane du planeur 4',
+  '18- Cabane du planeur 1',
+  '19- Cabane du planeur 3'
+];
+
+// Lignes relues en fin de feuille pour couvrir les fenêtres évaluées
+// (≈ 24 h + marge ; au pire ~100 scans/jour observés un dimanche).
+const RAPPORT_LIGNES_LUES = 500;
+
+// Marge avant le début nominal d'une fenêtre : une tournée commencée un
+// peu avant le quart compte pour ce quart (cas réel du 2026-10-18 :
+// premier scan à 17 h 59 min 42 s pour la tournée de nuit). La fin de
+// fenêtre reste stricte.
+const MARGE_DEBUT_MIN = 60;
+
+const FR_JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
+const FR_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
+  'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'];
+
+function frDate(d) {
+  return FR_JOURS[d.getDay()] + ' ' + d.getDate() + ' ' + FR_MOIS[d.getMonth()];
+}
+function frHeure(epochMs) {
+  const d = new Date(epochMs);
+  const m = d.getMinutes();
+  return d.getHours() + ' h' + (m > 0 ? ' ' + (m < 10 ? '0' : '') + m : '');
+}
+
+/** Point d'entrée du déclencheur quotidien. */
+function rapportTournee() {
+  const destinataires = PropertiesService.getScriptProperties()
+    .getProperty('RAPPORT_DESTINATAIRES');
+  if (!destinataires) {
+    Logger.log('Script Property RAPPORT_DESTINATAIRES absente — aucun envoi.');
+    return;
+  }
+  const rapport = construireRapport(new Date());
+  MailApp.sendEmail({
+    to: destinataires,
+    subject: rapport.objet,
+    body: rapport.corps,
+    name: 'Tournée des Pastilles'
+  });
+}
+
+/** Prévisualise le rapport dans le journal, sans rien envoyer. */
+function apercuRapport() {
+  const rapport = construireRapport(new Date());
+  Logger.log(rapport.objet + '\n\n' + rapport.corps);
+}
+
+/** Crée (ou recrée) le déclencheur quotidien de 6 h. À exécuter une fois. */
+function installerDeclencheur() {
+  ScriptApp.getProjectTriggers().forEach(function (t) {
+    if (t.getHandlerFunction() === 'rapportTournee') ScriptApp.deleteTrigger(t);
+  });
+  ScriptApp.newTrigger('rapportTournee')
+    .timeBased().everyDays(1).atHour(6).nearMinute(30).create();
+  Logger.log('Déclencheur quotidien installé (rapportTournee, ~6 h 30).');
+}
+
+/** Fenêtres de quart à évaluer un matin donné. */
+function fenetresAEvaluer(maintenant) {
+  const borneMatin = new Date(maintenant.getFullYear(), maintenant.getMonth(),
+    maintenant.getDate(), 6, 0, 0);
+  const veille = new Date(maintenant.getFullYear(), maintenant.getMonth(),
+    maintenant.getDate() - 1, 6, 0, 0);
+  const veille18 = new Date(veille.getFullYear(), veille.getMonth(),
+    veille.getDate(), 18, 0, 0);
+
+  const fenetres = [];
+  // Dimanche et lundi matin : la veille (samedi/dimanche) avait aussi
+  // un quart de jour à surveiller (usine fermée le weekend).
+  const jour = maintenant.getDay();
+  if (jour === 0 || jour === 1) {
+    fenetres.push({
+      nom: 'jour',
+      debut: veille,
+      fin: veille18,
+      titre: 'Jour du ' + frDate(veille) + ' (6 h → 18 h)',
+      court: 'jour du ' + frDate(veille).replace(/^\S+ /, '')
+    });
+  }
+  fenetres.push({
+    nom: 'nuit',
+    debut: veille18,
+    fin: borneMatin,
+    titre: 'Nuit du ' + frDate(veille) + ' au ' + frDate(borneMatin) + ' (18 h → 6 h)',
+    court: 'nuit du ' + veille.getDate() + ' au ' + borneMatin.getDate() + ' ' + FR_MOIS[borneMatin.getMonth()]
+  });
+  return fenetres;
+}
+
+/** Verdict d'une fenêtre à partir des lignes [date, point] relues. */
+function evaluerFenetre(fenetre, lignes) {
+  const vus = {};
+  const horsListe = {};
+  let nbScans = 0;
+  let premier = null;
+  let dernier = null;
+
+  const debutEval = fenetre.debut.getTime() - MARGE_DEBUT_MIN * 60 * 1000;
+  lignes.forEach(function (r) {
+    if (!(r[0] instanceof Date)) return;
+    const t = r[0].getTime();
+    if (t < debutEval || t >= fenetre.fin.getTime()) return;
+    const point = String(r[1]);
+    nbScans++;
+    if (premier === null || t < premier) premier = t;
+    if (dernier === null || t > dernier) dernier = t;
+    if (POINTS_ATTENDUS.indexOf(point) >= 0) vus[point] = true;
+    else horsListe[point] = true;
+  });
+
+  const manquants = POINTS_ATTENDUS.filter(function (p) { return !vus[p]; });
+  return {
+    fenetre: fenetre,
+    nbScans: nbScans,
+    premier: premier,
+    dernier: dernier,
+    nbVus: POINTS_ATTENDUS.length - manquants.length,
+    manquants: manquants,
+    horsListe: Object.keys(horsListe)
+  };
+}
+
+/** Compose l'objet et le corps du courriel pour un matin donné. */
+function construireRapport(maintenant) {
+  const fenetres = fenetresAEvaluer(maintenant);
+
+  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  const lastRow = sheet.getLastRow();
+  const n = Math.min(RAPPORT_LIGNES_LUES, lastRow);
+  const lignes = n > 0 ? sheet.getRange(lastRow - n + 1, 1, n, 2).getValues() : [];
+
+  const sections = fenetres.map(function (f) { return evaluerFenetre(f, lignes); });
+  const total = POINTS_ATTENDUS.length;
+  const tousComplets = sections.every(function (s) { return s.manquants.length === 0; });
+
+  function verdictCourt(s) {
+    if (s.manquants.length === 0) return 'COMPLÈTE';
+    return 'INCOMPLÈTE (' + s.manquants.length + ' manquant' + (s.manquants.length > 1 ? 's' : '') + ')';
+  }
+
+  let objet;
+  if (sections.length === 1) {
+    objet = (tousComplets ? '✅' : '⚠') + ' Tournée des Pastilles — '
+      + sections[0].fenetre.court + ' : ' + verdictCourt(sections[0]);
+  } else {
+    const veille = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate() - 1);
+    objet = (tousComplets ? '✅' : '⚠') + ' Tournées des Pastilles — '
+      + frDate(veille) + ' : '
+      + sections.map(function (s) { return s.fenetre.nom + ' ' + verdictCourt(s); }).join(' · ');
+  }
+
+  const blocs = sections.map(function (s) {
+    const l = [s.fenetre.titre];
+    l.push('Verdict : ' + verdictCourt(s) + ' — ' + s.nbVus + ' point' + (s.nbVus > 1 ? 's' : '') + ' sur ' + total);
+    if (s.nbScans === 0) {
+      l.push('Aucun scan reçu pendant cette fenêtre.');
+    } else {
+      l.push('Premier scan ' + frHeure(s.premier) + ' · dernier ' + frHeure(s.dernier)
+        + ' · ' + s.nbScans + ' scans reçus');
+    }
+    if (s.manquants.length > 0 && s.nbScans > 0) {
+      l.push('Points manquants :');
+      s.manquants.forEach(function (p) { l.push('  • ' + p); });
+    }
+    if (s.horsListe.length > 0) {
+      l.push('Scans hors liste : ' + s.horsListe.join(' ; '));
+    }
+    return l.join('\n');
+  });
+
+  const pied = 'Généré le ' + frDate(maintenant) + ' à ' + frHeure(maintenant.getTime())
+    + ' selon les données synchronisées dans le Google Sheets.\n'
+    + 'Un téléphone resté hors signal peut synchroniser ses scans après coup : '
+    + 'en cas de doute, revérifier le Sheets.\n\n'
+    + '— Rapport automatique (Apps Script « Tournée des Pastilles »)';
+
+  return { objet: objet, corps: blocs.join('\n\n---\n\n') + '\n\n' + pied };
 }

@@ -85,6 +85,36 @@ Le frontend envoie un POST cross-origin vers l'URL Apps Script avec un secret pa
    ```
 3. Le redéploiement garde la **même URL** — les téléphones ne voient aucune différence
 
+### Rapport quotidien de tournée (courriel)
+
+Chaque matin vers 6 h 30, `rapportTournee()` (déclencheur horaire Apps Script) envoie un courriel depuis `sechoirpfrcr@gmail.com` avec le verdict des quarts écoulés :
+
+- **Nuit (18 h → 6 h)** : évaluée toutes les nuits.
+- **Jour (6 h → 18 h)** : évaluée pour samedi et dimanche (usine fermée) — les rapports du dimanche et du lundi matin couvrent donc deux fenêtres.
+- Un quart est **COMPLET** si chacun des 19 points a été scanné au moins une fois dans sa fenêtre (ordre et regroupements sans importance). Les points manquants sont listés.
+- Marge de 60 min avant le début nominal d'une fenêtre (`MARGE_DEBUT_MIN`) : une tournée commencée un peu avant le quart compte pour ce quart.
+- Le courriel part **tous les jours**, complet ou non : l'absence de courriel est elle-même un signal de panne.
+
+**Destinataires** : Script Property `RAPPORT_DESTINATAIRES` (adresses séparées par des virgules), dans l'éditeur Apps Script → Paramètres du projet → Propriétés du script. Jamais d'adresse dans le code : le dépôt est public.
+
+**Mise en service (une fois, connecté au compte `sechoirpfrcr`)** :
+1. Ouvrir l'éditeur Apps Script du Sheets « Tournée des Pastilles ».
+2. Paramètres du projet → Propriétés du script → ajouter `RAPPORT_DESTINATAIRES`.
+3. Exécuter `apercuRapport` (prévisualisation dans le journal, aucun envoi) — accorder les autorisations demandées.
+4. Exécuter `rapportTournee` (envoi réel de test aux destinataires configurés).
+5. Exécuter `installerDeclencheur` (crée le déclencheur quotidien ~6 h 30 ; le relancer remplace l'ancien sans doublon).
+
+⚠ Le déclencheur exécute le code **HEAD** : un `npx clasp push` change le rapport immédiatement, sans `clasp deploy`. Le endpoint POST, lui, reste sur la version déployée. Si un `clasp deploy` suit un ajout de nouvelles autorisations (courriel, déclencheurs), faire d'abord la mise en service ci-dessus (l'autorisation dans l'éditeur), sinon la nouvelle version du web app peut se retrouver non autorisée.
+
+**Dépannage du rapport** :
+
+| Problème | Solution |
+|---|---|
+| Aucun courriel reçu | Éditeur Apps Script → Exécutions : voir si `rapportTournee` a tourné et son erreur · Déclencheurs : vérifier qu'il existe · Script Property `RAPPORT_DESTINATAIRES` présente ? |
+| Changer les destinataires | Modifier la Script Property, rien à redéployer |
+| Faux « incomplet » le matin | Le téléphone n'avait pas synchronisé à 6 h 30 (scans en attente) — le Sheets fait foi après coup |
+| Tournée à cheval sur 18 h ou 6 h | Marge de 60 min déjà appliquée au début de fenêtre ; ajuster `MARGE_DEBUT_MIN` au besoin |
+
 ### Liste des pastilles attendues (constante `TOURNEE_POINTS`)
 
 Codée en dur dans `docs/index.html`. Pour ajouter/retirer une pastille, modifier le tableau JavaScript (cherche `const TOURNEE_POINTS`), commit, push.
