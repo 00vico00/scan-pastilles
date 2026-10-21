@@ -20,6 +20,23 @@ const APP_URL = 'https://00vico00.github.io/scan-pastilles/';
 // durée de vie réaliste d'un scan en attente dans un téléphone.
 const DEDUP_WINDOW_ROWS = 300;
 
+// Feuille des scans, repérée par son identifiant (gid) et non par sa position :
+// l'onglet « Fermetures » vit à côté, et un onglet déplacé en tête ne doit
+// jamais recevoir les scans.
+const FEUILLE_SCANS_ID = 0;
+
+// Longueur maximale gardée pour le texte d'un QR (les vrais font < 50 car.).
+const POINT_MAX_CAR = 200;
+
+function feuilleScans() {
+  const feuille = SpreadsheetApp.getActiveSpreadsheet().getSheets()
+    .find(s => s.getSheetId() === FEUILLE_SCANS_ID);
+  // Pas de repli sur une autre feuille : mieux vaut que le téléphone garde
+  // ses scans en attente que de les écrire au mauvais endroit.
+  if (!feuille) throw new Error('feuille des scans introuvable (gid ' + FEUILLE_SCANS_ID + ')');
+  return feuille;
+}
+
 function doGet(e) {
   return HtmlService.createHtmlOutput(
     '<p style="font-family:sans-serif;padding:24px">L\'app de scan a déménagé : '
@@ -53,7 +70,7 @@ function doPost(e) {
     }
 
     try {
-      const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+      const sheet = feuilleScans();
       const lastRow = sheet.getLastRow();
 
       // Idempotence : le téléphone ré-envoie tout lot dont il n'a pas vu la
@@ -71,18 +88,29 @@ function doPost(e) {
         });
       }
 
+      // Colonne D = heure de réception par le serveur. Comparée à la colonne A
+      // (heure du scan, horloge du téléphone), elle mesure le délai de synchro
+      // et trahit une horloge fausse ou un scan antidaté.
+      const recuLe = new Date();
       const rows = [];
       scans.forEach(s => {
-        const key = new Date(s.ts).getTime() + '|' + String(s.point);
+        // Entrée illisible écartée sans bloquer le lot : sinon le téléphone
+        // la ré-enverrait à chaque essai et toute sa file resterait coincée.
+        if (!s || typeof s.point !== 'string' || s.point === '') return;
+        const date = new Date(s.ts);
+        if (isNaN(date.getTime())) return;
+        const point = s.point.slice(0, POINT_MAX_CAR);
+        const key = date.getTime() + '|' + point;
         if (seen.has(key)) return;
         seen.add(key); // couvre aussi un doublon interne au lot
-        rows.push([new Date(s.ts), String(s.point), 1]);
+        rows.push([date, point, 1, recuLe]);
       });
 
       if (rows.length > 0) {
         const startRow = lastRow + 1;
-        sheet.getRange(startRow, 1, rows.length, 3).setValues(rows);
+        sheet.getRange(startRow, 1, rows.length, 4).setValues(rows);
         sheet.getRange(startRow, 1, rows.length, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss');
+        sheet.getRange(startRow, 4, rows.length, 1).setNumberFormat('yyyy-mm-dd hh:mm:ss');
       }
 
       // added = lignes réellement écrites ; un lot entièrement déjà connu
@@ -98,33 +126,54 @@ function doPost(e) {
 
 /**
  * Fonction utilitaire pour tester depuis l'éditeur Apps Script.
- * Exécute-la une fois après le déploiement pour vérifier l'écriture.
+ * Écrit une ligne de test puis la retire (le Sheets est celui de production).
  */
 function testWrite() {
+  const marque = 'TEST - À supprimer';
   const fakeEvent = {
     postData: {
       contents: JSON.stringify({
         secret: SHARED_SECRET,
         scans: [
-          { ts: new Date().toISOString(), point: 'TEST - À supprimer' }
+          { ts: new Date().toISOString(), point: marque }
         ]
       })
     }
   };
   const result = doPost(fakeEvent);
   Logger.log(result.getContent());
+
+  const lock = LockService.getScriptLock();
+  if (!lock.tryLock(30 * 1000)) {
+    Logger.log('Verrou occupé : retirer la ligne « ' + marque + ' » à la main.');
+    return;
+  }
+  try {
+    const sheet = feuilleScans();
+    const last = sheet.getLastRow();
+    if (sheet.getRange(last, 2).getValue() === marque) {
+      sheet.deleteRow(last);
+      Logger.log('Ligne de test retirée.');
+    } else {
+      Logger.log('Ligne de test introuvable en fin de feuille : la chercher à la main.');
+    }
+  } finally {
+    lock.releaseLock();
+  }
 }
 
 // ====================================================================
 // Rapport quotidien de tournée
 // ====================================================================
 // La tournée prouve que la surveillance incendie a été faite par
-// l'opérateur présent quand l'usine est fermée. Quarts évalués :
+// l'opérateur présent quand l'usine est fermée : une tournée complète
+// dans chaque quart où les opérations sont à l'arrêt.
 //   nuit = 18 h → 6 h (toutes les nuits)
-//   jour = 6 h → 18 h (samedi et dimanche seulement)
+//   jour = 6 h → 18 h (samedi, dimanche et jours inscrits dans l'onglet
+//          « Fermetures » : fériés, arrêts)
 // Le rapport du matin (déclencheur ~6 h 30) couvre les quarts écoulés
-// depuis le rapport précédent : 1 fenêtre en semaine, 2 les dimanche
-// et lundi matin. Il part TOUJOURS (trace quotidienne : l'absence de
+// depuis le rapport précédent : la nuit, plus le jour de la veille s'il
+// était surveillé. Il part TOUJOURS (trace quotidienne : l'absence de
 // courriel est elle-même un signal de panne).
 //
 // Destinataires : Script Property RAPPORT_DESTINATAIRES (adresses
@@ -158,11 +207,21 @@ const POINTS_ATTENDUS = [
 // (≈ 24 h + marge ; au pire ~100 scans/jour observés un dimanche).
 const RAPPORT_LIGNES_LUES = 500;
 
-// Marge avant le début nominal d'une fenêtre : une tournée commencée un
-// peu avant le quart compte pour ce quart (cas réel du 2026-10-18 :
-// premier scan à 17 h 59 min 42 s pour la tournée de nuit). La fin de
-// fenêtre reste stricte.
-const MARGE_DEBUT_MIN = 60;
+// Bornes des quarts strictes : 6 h et 18 h (Nicholas, 2026-10-20). Une
+// tournée faite à la toute fin du quart peut déborder de quelques minutes,
+// ou commencer juste avant (2026-10-18 : premier scan à 17 h 59 min 42 s).
+// Les scans sont donc regroupés en suites : un écart de ECART_SUITE_MIN ou
+// plus entre deux scans, ou un point déjà vu dans la suite et rescanné
+// NOUVEAU_PASSAGE_MIN plus tard (deux tournées dos à dos), ouvre une
+// nouvelle suite. Une suite à cheval sur une borne compte EN ENTIER pour
+// le quart où tombe la majorité de ses scans (égalité : le quart qui se
+// termine). Chaque scan ne compte que pour un quart.
+const ECART_SUITE_MIN = 20;
+const NOUVEAU_PASSAGE_MIN = 10;
+
+// Onglet des jours de semaine où l'usine est fermée (fériés, arrêts) :
+// colonne A = date, colonne B = libellé (facultatif), ligne 1 = en-têtes.
+const ONGLET_FERMETURES = 'Fermetures';
 
 const FR_JOURS = ['dimanche', 'lundi', 'mardi', 'mercredi', 'jeudi', 'vendredi', 'samedi'];
 const FR_MOIS = ['janvier', 'février', 'mars', 'avril', 'mai', 'juin',
@@ -175,6 +234,18 @@ function frHeure(epochMs) {
   const d = new Date(epochMs);
   const m = d.getMinutes();
   return d.getHours() + ' h' + (m > 0 ? ' ' + (m < 10 ? '0' : '') + m : '');
+}
+function cleJour(d) {
+  return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+}
+
+/** Quart d'un instant : 'J AAAA-MM-JJ' (6 h → 18 h) ou 'N AAAA-MM-JJ' (nuit commencée ce jour-là à 18 h). */
+function cleQuart(epochMs) {
+  const d = new Date(epochMs);
+  const h = d.getHours();
+  if (h >= 6 && h < 18) return 'J ' + cleJour(d);
+  if (h >= 18) return 'N ' + cleJour(d);
+  return 'N ' + cleJour(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
 }
 
 /** Point d'entrée du déclencheur quotidien. */
@@ -210,57 +281,118 @@ function installerDeclencheur() {
   Logger.log('Déclencheur quotidien installé (rapportTournee, ~6 h 30).');
 }
 
+/**
+ * Jours de fermeture lus dans l'onglet ONGLET_FERMETURES :
+ * { 'AAAA-MM-JJ': libellé }, ou null si l'onglet n'existe pas.
+ */
+function lireFermetures(ss) {
+  const feuille = ss.getSheetByName(ONGLET_FERMETURES);
+  if (!feuille) return null;
+  const fermetures = {};
+  const n = feuille.getLastRow() - 1;
+  if (n < 1) return fermetures;
+  feuille.getRange(2, 1, n, 2).getValues().forEach(function (r) {
+    let cle = null;
+    if (r[0] instanceof Date) cle = cleJour(r[0]);
+    else if (/^\d{4}-\d{2}-\d{2}$/.test(String(r[0]).trim())) cle = String(r[0]).trim();
+    if (cle) fermetures[cle] = String(r[1] || '').trim();
+  });
+  return fermetures;
+}
+
 /** Fenêtres de quart à évaluer un matin donné. */
-function fenetresAEvaluer(maintenant) {
-  const borneMatin = new Date(maintenant.getFullYear(), maintenant.getMonth(),
-    maintenant.getDate(), 6, 0, 0);
-  const veille = new Date(maintenant.getFullYear(), maintenant.getMonth(),
-    maintenant.getDate() - 1, 6, 0, 0);
-  const veille18 = new Date(veille.getFullYear(), veille.getMonth(),
-    veille.getDate(), 18, 0, 0);
+function fenetresAEvaluer(maintenant, fermetures) {
+  const veille = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate() - 1);
+  const matin = new Date(maintenant.getFullYear(), maintenant.getMonth(), maintenant.getDate());
 
   const fenetres = [];
-  // Dimanche et lundi matin : la veille (samedi/dimanche) avait aussi
-  // un quart de jour à surveiller (usine fermée le weekend).
-  const jour = maintenant.getDay();
-  if (jour === 0 || jour === 1) {
+  // Quart de jour de la veille : surveillé le samedi, le dimanche et les
+  // jours de fermeture (l'usine ne tourne pas).
+  const fermeture = fermetures ? fermetures[cleJour(veille)] : undefined;
+  const finDeSemaine = veille.getDay() === 0 || veille.getDay() === 6;
+  if (finDeSemaine || fermeture !== undefined) {
     fenetres.push({
       nom: 'jour',
-      debut: veille,
-      fin: veille18,
-      titre: 'Jour du ' + frDate(veille) + ' (6 h → 18 h)',
+      quart: 'J ' + cleJour(veille),
+      titre: 'Jour du ' + frDate(veille) + ' (6 h → 18 h)' + (fermeture ? ' — ' + fermeture : ''),
       court: 'jour du ' + frDate(veille).replace(/^\S+ /, '')
     });
   }
   fenetres.push({
     nom: 'nuit',
-    debut: veille18,
-    fin: borneMatin,
-    titre: 'Nuit du ' + frDate(veille) + ' au ' + frDate(borneMatin) + ' (18 h → 6 h)',
-    court: 'nuit du ' + veille.getDate() + ' au ' + borneMatin.getDate() + ' ' + FR_MOIS[borneMatin.getMonth()]
+    quart: 'N ' + cleJour(veille),
+    titre: 'Nuit du ' + frDate(veille) + ' au ' + frDate(matin) + ' (18 h → 6 h)',
+    court: 'nuit du ' + veille.getDate() + ' au ' + matin.getDate() + ' ' + FR_MOIS[matin.getMonth()]
   });
   return fenetres;
 }
 
-/** Verdict d'une fenêtre à partir des lignes [date, point] relues. */
-function evaluerFenetre(fenetre, lignes) {
+/**
+ * Range chaque scan dans un seul quart (voir ECART_SUITE_MIN). Les lignes
+ * [date, point] sont dédoublonnées (doublons de transport d'avant le
+ * 2026-10-20) et triées (un lot resté hors ligne arrive en retard).
+ */
+function rangerParQuart(lignes) {
+  const dejaLu = {};
+  const scans = [];
+  lignes.forEach(function (r) {
+    if (!(r[0] instanceof Date)) return;
+    const t = r[0].getTime();
+    const point = String(r[1]);
+    if (dejaLu[t + '|' + point]) return;
+    dejaLu[t + '|' + point] = true;
+    scans.push({ t: t, point: point, quart: cleQuart(t) });
+  });
+  scans.sort(function (a, b) { return a.t - b.t; });
+
+  const ecart = ECART_SUITE_MIN * 60 * 1000;
+  const nouveauPassage = NOUVEAU_PASSAGE_MIN * 60 * 1000;
+  let suite = [];
+  let vuDansSuite = {};
+  scans.forEach(function (s) {
+    const prec = suite.length > 0 ? suite[suite.length - 1] : null;
+    const vu = vuDansSuite[s.point];
+    if (prec && (s.t - prec.t >= ecart || (vu !== undefined && s.t - vu >= nouveauPassage))) {
+      attribuerSuite(suite);
+      suite = [];
+      vuDansSuite = {};
+    }
+    suite.push(s);
+    vuDansSuite[s.point] = s.t;
+  });
+  attribuerSuite(suite);
+  return scans;
+}
+
+/** Une suite à cheval sur une borne va en entier au quart majoritaire. */
+function attribuerSuite(suite) {
+  const compte = {};
+  const ordre = [];
+  suite.forEach(function (s) {
+    if (!(s.quart in compte)) { compte[s.quart] = 0; ordre.push(s.quart); }
+    compte[s.quart]++;
+  });
+  if (ordre.length < 2) return;
+  let gagnant = ordre[0];
+  ordre.forEach(function (q) { if (compte[q] > compte[gagnant]) gagnant = q; });
+  suite.forEach(function (s) { s.quart = gagnant; });
+}
+
+/** Verdict d'une fenêtre à partir des scans rangés par quart. */
+function evaluerFenetre(fenetre, scans) {
   const vus = {};
   const horsListe = {};
   let nbScans = 0;
   let premier = null;
   let dernier = null;
 
-  const debutEval = fenetre.debut.getTime() - MARGE_DEBUT_MIN * 60 * 1000;
-  lignes.forEach(function (r) {
-    if (!(r[0] instanceof Date)) return;
-    const t = r[0].getTime();
-    if (t < debutEval || t >= fenetre.fin.getTime()) return;
-    const point = String(r[1]);
+  scans.forEach(function (s) {
+    if (s.quart !== fenetre.quart) return;
     nbScans++;
-    if (premier === null || t < premier) premier = t;
-    if (dernier === null || t > dernier) dernier = t;
-    if (POINTS_ATTENDUS.indexOf(point) >= 0) vus[point] = true;
-    else horsListe[point] = true;
+    if (premier === null || s.t < premier) premier = s.t;
+    if (dernier === null || s.t > dernier) dernier = s.t;
+    if (POINTS_ATTENDUS.indexOf(s.point) >= 0) vus[s.point] = true;
+    else horsListe[s.point] = true;
   });
 
   const manquants = POINTS_ATTENDUS.filter(function (p) { return !vus[p]; });
@@ -277,19 +409,23 @@ function evaluerFenetre(fenetre, lignes) {
 
 /** Compose l'objet et le corps du courriel pour un matin donné. */
 function construireRapport(maintenant) {
-  const fenetres = fenetresAEvaluer(maintenant);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const fermetures = lireFermetures(ss);
+  const fenetres = fenetresAEvaluer(maintenant, fermetures);
 
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheets()[0];
+  const sheet = feuilleScans();
   const lastRow = sheet.getLastRow();
   const n = Math.min(RAPPORT_LIGNES_LUES, lastRow);
   const lignes = n > 0 ? sheet.getRange(lastRow - n + 1, 1, n, 2).getValues() : [];
+  const scans = rangerParQuart(lignes);
 
-  const sections = fenetres.map(function (f) { return evaluerFenetre(f, lignes); });
+  const sections = fenetres.map(function (f) { return evaluerFenetre(f, scans); });
   const total = POINTS_ATTENDUS.length;
   const tousComplets = sections.every(function (s) { return s.manquants.length === 0; });
 
   function verdictCourt(s) {
     if (s.manquants.length === 0) return 'COMPLÈTE';
+    if (s.nbScans === 0) return 'AUCUN SCAN';
     return 'INCOMPLÈTE (' + s.manquants.length + ' manquant' + (s.manquants.length > 1 ? 's' : '') + ')';
   }
 
@@ -308,7 +444,7 @@ function construireRapport(maintenant) {
     const l = [s.fenetre.titre];
     l.push('Verdict : ' + verdictCourt(s) + ' — ' + s.nbVus + ' point' + (s.nbVus > 1 ? 's' : '') + ' sur ' + total);
     if (s.nbScans === 0) {
-      l.push('Aucun scan reçu pendant cette fenêtre.');
+      l.push('Aucun scan reçu pendant ce quart.');
     } else {
       l.push('Premier scan ' + frHeure(s.premier) + ' · dernier ' + frHeure(s.dernier)
         + ' · ' + s.nbScans + ' scans reçus');
@@ -325,9 +461,14 @@ function construireRapport(maintenant) {
 
   const pied = 'Généré le ' + frDate(maintenant) + ' à ' + frHeure(maintenant.getTime())
     + ' selon les données synchronisées dans le Google Sheets.\n'
+    + 'Quarts 6 h → 18 h et 18 h → 6 h ; une tournée à cheval sur 6 h ou 18 h '
+    + 'compte pour le quart où tombent la plupart de ses scans.\n'
     + 'Un téléphone resté hors signal peut synchroniser ses scans après coup : '
-    + 'en cas de doute, revérifier le Sheets.\n\n'
-    + '— Rapport automatique (Apps Script « Tournée des Pastilles »)';
+    + 'en cas de doute, revérifier le Sheets.\n'
+    + (fermetures === null
+      ? '⚠ Onglet « ' + ONGLET_FERMETURES + ' » introuvable : seuls les samedis et dimanches sont surveillés de jour.\n'
+      : '')
+    + '\n— Rapport automatique (Apps Script « Tournée des Pastilles »)';
 
   return { objet: objet, corps: blocs.join('\n\n---\n\n') + '\n\n' + pied };
 }
