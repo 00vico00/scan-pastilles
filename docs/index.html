@@ -2,10 +2,6 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta http-equiv="X-UA-Compatible" content="IE=edge">
-  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-  <meta http-equiv="Pragma" content="no-cache">
-  <meta http-equiv="Expires" content="0">
   <title>Tournée des Pastilles</title>
   <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
   <meta name="mobile-web-app-capable" content="yes">
@@ -46,8 +42,12 @@
     }
 
     header h1 {
-      font-size: 22px;
+      font-size: 20px;
       font-weight: 700;
+      min-width: 0;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
     }
 
     .status-bar {
@@ -56,7 +56,12 @@
       gap: 10px;
       font-size: 16px;
       font-weight: 600;
+      flex-shrink: 0;
+      margin-left: 10px;
+      white-space: nowrap;
     }
+    /* Au cellulaire, la pastille « N en attente » remplace le mot En ligne / Hors ligne : la couleur du point suffit. */
+    #pending-pill.visible ~ #status-text { display: none; }
     #status-dot {
       width: 16px;
       height: 16px;
@@ -66,6 +71,7 @@
     }
     #status-dot.online { background: #4ade80; box-shadow: 0 0 10px #4ade80; }
     #status-dot.offline { background: #f87171; box-shadow: 0 0 10px #f87171; }
+    #status-dot.serveur { background: #fbbf24; box-shadow: 0 0 10px #fbbf24; }
 
     #pending-pill {
       display: none;
@@ -142,7 +148,7 @@
       white-space: nowrap;
     }
     .tour-progress-banner.complete {
-      background: rgba(11, 110, 45, 0.95);
+      background: rgba(22, 163, 74, 0.95);
     }
 
     .open-list-btn {
@@ -166,6 +172,12 @@
     }
     .open-list-btn:active { background: rgba(0,0,0,0.85); }
     .open-list-btn svg { width: 20px; height: 20px; }
+
+    /* Lampe de poche : affichée seulement si la caméra en offre une. */
+    .torch-btn { top: 66px; display: none; }
+    .torch-btn.visible { display: inline-flex; }
+    .torch-btn.on { background: #fbbf24; border-color: #fbbf24; color: #111; }
+    .torch-btn.on:active { background: #f59e0b; }
 
     /* === Vue Liste === */
     #list-overlay {
@@ -512,6 +524,10 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
           <span>Liste</span>
         </button>
+        <button class="open-list-btn torch-btn" id="torch-btn" aria-label="Allumer la lampe de poche" aria-pressed="false">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 2h6l-1 6h-4z"/><path d="M10 8h4v13a1 1 0 0 1-1 1h-2a1 1 0 0 1-1-1z"/><line x1="12" y1="12" x2="12" y2="14"/></svg>
+          <span>Lampe</span>
+        </button>
         <div class="scan-hint">Pointe la caméra sur la pastille</div>
       </div>
     </div>
@@ -523,7 +539,7 @@
         <button class="list-close-x" id="list-close-x" aria-label="Fermer">✕</button>
       </div>
       <div class="list-progress">
-        <div class="list-progress-number" id="list-progress-number">0 / 19</div>
+        <div class="list-progress-number" id="list-progress-number"></div>
         <div class="list-progress-label">pastilles scannées dans cette tournée</div>
       </div>
       <div class="list-body" id="list-body"></div>
@@ -559,19 +575,7 @@
     </div>
   </div>
 
-  <script>
-    // Désinstalle tout Service Worker précédemment enregistré et vide les caches.
-    // On revient à du HTML pur servi directement par GitHub Pages — plus de cache emprisonné.
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then((regs) => {
-        regs.forEach((r) => r.unregister().catch(() => {}));
-      }).catch(() => {});
-    }
-    if (window.caches && caches.keys) {
-      caches.keys().then((names) => names.forEach((n) => caches.delete(n))).catch(() => {});
-    }
-  </script>
-  <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+  <script src="vendor/html5-qrcode-2.3.8.min.js"></script>
   <script>
   (function() {
     'use strict';
@@ -580,6 +584,14 @@
     const SHARED_SECRET = 'tournee-pastilles-chr-2026';
     const MULTI_FRAME_WINDOW_MS = 1500;
     const SYNC_INTERVAL_MS = 30000;
+    // Au-delà, un envoi est abandonné (signal faible) et retenté plus tard.
+    // Sans danger : si le serveur a écrit quand même, doPost écarte le doublon.
+    const SYNC_TIMEOUT_MS = 20000;
+    // Après « Scanner la prochaine », la caméra vise souvent encore la même
+    // pastille : on l'ignore ce temps-là.
+    const REPRISE_IGNORE_MS = 4000;
+    // Plafond du corps d'une requête keepalive (64 Ko chez Chrome).
+    const KEEPALIVE_MAX_OCTETS = 60000;
 
     // Pastilles attendues dans une tournée complète (extraites du document officiel)
     const TOURNEE_POINTS = [
@@ -603,7 +615,6 @@
       '18- Cabane du planeur 1',
       '19- Cabane du planeur 3'
     ];
-    const TOURNEE_STORAGE_KEY = 'tournee-scanned-v1';
 
     const ui = {
       reader: document.getElementById('reader'),
@@ -614,6 +625,7 @@
       startBtn: document.getElementById('start-btn'),
       tourProgressBanner: document.getElementById('tour-progress-banner'),
       openListBtn: document.getElementById('open-list-btn'),
+      torchBtn: document.getElementById('torch-btn'),
       listOverlay: document.getElementById('list-overlay'),
       listCloseX: document.getElementById('list-close-x'),
       listProgressNumber: document.getElementById('list-progress-number'),
@@ -631,23 +643,120 @@
     };
 
     let scanner = null;
-    let isSyncing = false;
-    let lastFrameByPoint = new Map();
+    let torche = null;
+    let ignorerJusqua = new Map();
+    let dernierPoint = null;
     let overlayOpen = false;
+    let confirmEnAttente = false;
     let currentTourComplete = false;
 
     // === Tournée (localStorage) ===
-    function getScannedTour() {
+    // Le téléphone compte la tournée comme le rapport du matin (Code.gs) :
+    // quarts 6 h → 18 h et 18 h → 6 h ; scans regroupés en suites (un écart
+    // de 20 min, ou un point rescanné 10 min plus tard, ouvre une nouvelle
+    // suite) ; une suite à cheval sur 6 h ou 18 h compte pour le quart où
+    // tombent la plupart de ses scans. Progression affichée = points du
+    // quart en cours + points de la suite en cours (dernier scan il y a
+    // moins de 20 min ; une suite complète ne compte ainsi que si son
+    // dernier scan est du quart en cours, pour que l'opérateur suivant ne
+    // voie pas la tournée de celui qui part). Elle repart donc à zéro
+    // d'elle-même au changement de quart.
+    const ECART_SUITE_MS = 20 * 60 * 1000;      // ECART_SUITE_MIN dans Code.gs
+    const NOUVEAU_PASSAGE_MS = 10 * 60 * 1000;  // NOUVEAU_PASSAGE_MIN dans Code.gs
+    const CONSERVATION_MS = 36 * 3600 * 1000;
+    const TOURNEE_STORAGE_KEY = 'tournee-v2';
+    const ANCIENNE_CLE_TOURNEE = 'tournee-scanned-v1';
+
+    function cleJour(d) {
+      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    function cleQuart(epochMs) {
+      const d = new Date(epochMs);
+      const h = d.getHours();
+      if (h >= 6 && h < 18) return 'J ' + cleJour(d);
+      if (h >= 18) return 'N ' + cleJour(d);
+      return 'N ' + cleJour(new Date(d.getFullYear(), d.getMonth(), d.getDate() - 1));
+    }
+    function quartMajoritaire(suite) {
+      const compte = {};
+      let gagnant = null;
+      suite.forEach(s => {
+        const q = cleQuart(s.t);
+        compte[q] = (compte[q] || 0) + 1;
+        if (gagnant === null || compte[q] > compte[gagnant]) gagnant = q; // égalité : le quart qui se termine
+      });
+      return gagnant;
+    }
+
+    function lireEtat() {
       try {
         const raw = localStorage.getItem(TOURNEE_STORAGE_KEY);
-        return new Set(raw ? JSON.parse(raw) : []);
-      } catch { return new Set(); }
+        if (raw) {
+          const etat = JSON.parse(raw);
+          if (etat && Array.isArray(etat.scans)) return etat;
+        }
+        const ancien = localStorage.getItem(ANCIENNE_CLE_TOURNEE);
+        if (ancien) {
+          // Ancien format (points sans heure) : rattachés au quart en cours.
+          // Au pire, une tournée périmée reste affichée jusqu'au prochain
+          // changement de quart.
+          const t = Date.now();
+          const etat = { remise: 0, scans: JSON.parse(ancien).map(p => ({ t: t, p: p })) };
+          ecrireEtat(etat);
+          localStorage.removeItem(ANCIENNE_CLE_TOURNEE);
+          return etat;
+        }
+      } catch {}
+      return { remise: 0, scans: [] };
     }
-    function setScannedTour(set) {
-      try { localStorage.setItem(TOURNEE_STORAGE_KEY, JSON.stringify(Array.from(set))); } catch {}
+    function ecrireEtat(etat) {
+      const limite = Date.now() - CONSERVATION_MS;
+      etat.scans = etat.scans.filter(s => s.t >= limite);
+      try { localStorage.setItem(TOURNEE_STORAGE_KEY, JSON.stringify(etat)); } catch {}
     }
-    function resetTour() {
-      try { localStorage.removeItem(TOURNEE_STORAGE_KEY); } catch {}
+    function getScannedTour() {
+      const maintenant = Date.now();
+      const etat = lireEtat();
+      const scans = etat.scans.filter(s => s.t > etat.remise).sort((a, b) => a.t - b.t);
+
+      const suites = [];
+      let suite = null;
+      let vu = {};
+      scans.forEach(s => {
+        const prec = suite && suite[suite.length - 1];
+        if (!prec || s.t - prec.t >= ECART_SUITE_MS || (vu[s.p] !== undefined && s.t - vu[s.p] >= NOUVEAU_PASSAGE_MS)) {
+          suite = [];
+          vu = {};
+          suites.push(suite);
+        }
+        suite.push(s);
+        vu[s.p] = s.t;
+      });
+
+      const quartCourant = cleQuart(maintenant);
+      const points = new Set();
+      suites.forEach((suite, i) => {
+        const pointsSuite = new Set(suite.map(s => s.p));
+        const dernierScan = suite[suite.length - 1].t;
+        const enCours = i === suites.length - 1
+          && maintenant - dernierScan < ECART_SUITE_MS
+          && (!TOURNEE_POINTS.every(p => pointsSuite.has(p)) || cleQuart(dernierScan) === quartCourant);
+        if (enCours || quartMajoritaire(suite) === quartCourant) {
+          pointsSuite.forEach(p => points.add(p));
+        }
+      });
+      return points;
+    }
+    function enregistrerScanTournee(point, t) {
+      const etat = lireEtat();
+      etat.scans.push({ t: t, p: point });
+      ecrireEtat(etat);
+    }
+    // Oublie les scans faits jusqu'à `instant` (maintenant par défaut).
+    function resetTour(instant) {
+      const etat = lireEtat();
+      etat.remise = instant === undefined ? Date.now() : instant;
+      ecrireEtat(etat);
     }
     function getRemainingTour() {
       const scanned = getScannedTour();
@@ -669,18 +778,28 @@
     // === IndexedDB ===
     const DB_NAME = 'scan-pastilles-db';
     const STORE = 'pending';
+    let dbPromise = null;
     function openDB() {
-      return new Promise((resolve, reject) => {
-        const req = indexedDB.open(DB_NAME, 1);
-        req.onupgradeneeded = () => {
-          const db = req.result;
-          if (!db.objectStoreNames.contains(STORE)) {
-            db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
-          }
-        };
-        req.onsuccess = () => resolve(req.result);
-        req.onerror = () => reject(req.error);
-      });
+      if (!dbPromise) {
+        dbPromise = new Promise((resolve, reject) => {
+          const req = indexedDB.open(DB_NAME, 1);
+          req.onupgradeneeded = () => {
+            const db = req.result;
+            if (!db.objectStoreNames.contains(STORE)) {
+              db.createObjectStore(STORE, { keyPath: 'id', autoIncrement: true });
+            }
+          };
+          req.onsuccess = () => {
+            const db = req.result;
+            // Connexion fermée par le navigateur : en rouvrir une au prochain appel.
+            db.onclose = () => { dbPromise = null; };
+            db.onversionchange = () => { db.close(); dbPromise = null; };
+            resolve(db);
+          };
+          req.onerror = () => { dbPromise = null; reject(req.error); };
+        });
+      }
+      return dbPromise;
     }
     async function dbAdd(scan) {
       const db = await openDB();
@@ -724,6 +843,14 @@
     function vibrate(pattern) { if (navigator.vibrate) navigator.vibrate(pattern); }
 
     let audioCtx = null;
+    // Chrome garde le son coupé tant que la page n'a reçu aucun toucher :
+    // on crée et réveille le contexte audio au premier toucher.
+    function debloquerAudio() {
+      try {
+        if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        if (audioCtx.state === 'suspended') audioCtx.resume();
+      } catch (e) {}
+    }
     function beep(freq, duration) {
       try {
         if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -749,9 +876,10 @@
       }
       return n;
     }
-    function setOnlineStatus(online) {
-      ui.statusDot.className = online ? 'online' : 'offline';
-      ui.statusText.textContent = online ? 'En ligne' : 'Hors ligne';
+    // etat : 'online' | 'offline' | 'serveur' (réseau présent, envoi refusé)
+    function setOnlineStatus(etat) {
+      ui.statusDot.className = etat;
+      ui.statusText.textContent = { online: 'En ligne', offline: 'Hors ligne', serveur: 'Erreur serveur' }[etat];
     }
 
     // === Confirm overlay ===
@@ -802,6 +930,7 @@
       // Sync status (commence en "envoi en cours")
       ui.confirmStatus.className = 'confirm-status syncing';
       ui.confirmStatus.innerHTML = '<span class="spinner"></span><span>Envoi en cours…</span>';
+      confirmEnAttente = false;
 
       const d = new Date(ts);
       ui.confirmTime.textContent = 'Scanné à ' + d.toLocaleTimeString('fr-CA', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -826,14 +955,20 @@
       ui.confirmOverlay.classList.add('show');
     }
     function setConfirmStatusSynced() {
+      confirmEnAttente = false;
       ui.confirmStatus.className = 'confirm-status synced';
       ui.confirmStatus.innerHTML = '<span style="font-size:22px">✓</span><span>Enregistré</span>';
     }
-    function setConfirmStatusPending(n) {
+    function setConfirmStatusPending(n, raison) {
+      confirmEnAttente = true;
+      const texte = raison === 'refused'
+        ? 'Sauvegardé · le serveur n\'a pas répondu, nouvel essai automatique'
+        : 'Sauvegardé · sera envoyé au retour du signal';
       ui.confirmStatus.className = 'confirm-status pending';
-      ui.confirmStatus.innerHTML = '<span style="font-size:22px">💾</span><span>Sauvegardé · sera envoyé au retour du signal' + (n > 1 ? ' (' + n + ' en attente)' : '') + '</span>';
+      ui.confirmStatus.innerHTML = '<span style="font-size:22px">💾</span><span>' + texte + (n > 1 ? ' (' + n + ' en attente)' : '') + '</span>';
     }
     function setConfirmStatusError(msg) {
+      confirmEnAttente = false;
       ui.confirmStatus.className = 'confirm-status error';
       ui.confirmStatus.innerHTML = '<span style="font-size:22px">⚠</span><span>' + escapeHtml(msg) + '</span>';
     }
@@ -846,7 +981,9 @@
       }
       ui.confirmOverlay.classList.remove('show');
       overlayOpen = false;
-      lastFrameByPoint.clear();
+      confirmEnAttente = false;
+      ignorerJusqua.clear();
+      if (dernierPoint) ignorerJusqua.set(dernierPoint, Date.now() + REPRISE_IGNORE_MS);
       if (scanner) {
         try { await scanner.resume(); } catch (e) {}
       }
@@ -891,9 +1028,9 @@
       if (overlayOpen) return;
 
       const now = Date.now();
-      const last = lastFrameByPoint.get(decoded) || 0;
-      if (now - last < MULTI_FRAME_WINDOW_MS) return;
-      lastFrameByPoint.set(decoded, now);
+      if (now < (ignorerJusqua.get(decoded) || 0)) return;
+      ignorerJusqua.set(decoded, now + MULTI_FRAME_WINDOW_MS);
+      dernierPoint = decoded;
 
       if (scanner) {
         try { await scanner.pause(true); } catch (e) {}
@@ -911,13 +1048,17 @@
       }
 
       // Tracking tournée
-      const scanned = getScannedTour();
       const isInList = TOURNEE_POINTS.includes(decoded);
-      const wasAlready = scanned.has(decoded);
-      if (isInList && !wasAlready) {
-        scanned.add(decoded);
-        setScannedTour(scanned);
+      let avant = getScannedTour();
+      if (isInList && TOURNEE_POINTS.every(p => avant.has(p))) {
+        // Tournée déjà complète (écran « Tournée terminée » quitté sans
+        // toucher « Nouvelle tournée ») : ce scan ouvre la suivante.
+        resetTour(now - 1);
+        avant = new Set();
       }
+      const wasAlready = avant.has(decoded);
+      if (isInList) enregistrerScanTournee(decoded, now);
+      const scanned = getScannedTour();
       const remaining = TOURNEE_POINTS.filter(p => !scanned.has(p));
       const isComplete = isInList && remaining.length === 0;
 
@@ -934,56 +1075,109 @@
       // Sync
       const result = await flushPending();
       const pendingCount = await updatePendingBadge();
-      if (result === 'synced') {
+      if (result === 'synced' || pendingCount === 0) {
         setConfirmStatusSynced();
         beep(1320, 0.1);
       } else {
-        setConfirmStatusPending(pendingCount);
+        setConfirmStatusPending(pendingCount, result);
       }
     }
 
     // === Sync ===
-    async function flushPending() {
-      if (isSyncing) return 'noop';
+    function corpsLot(items) {
+      return JSON.stringify({
+        secret: SHARED_SECRET,
+        scans: items.map(i => ({ ts: i.ts, point: i.point }))
+      });
+    }
+
+    // Un seul envoi à la fois ; un appel pendant un envoi attend sa fin puis
+    // repart, pour emporter les scans arrivés entre-temps.
+    let syncEnCours = null;
+    function flushPending() {
+      if (syncEnCours) return syncEnCours.then(() => flushPending());
+      syncEnCours = envoyerLot().finally(() => { syncEnCours = null; });
+      return syncEnCours;
+    }
+    async function envoyerLot() {
       const items = await dbGetAll();
       if (items.length === 0) return 'noop';
       if (!navigator.onLine) {
-        setOnlineStatus(false);
+        setOnlineStatus('offline');
         return 'offline';
       }
-      isSyncing = true;
+      const ctrl = new AbortController();
+      const minuterie = setTimeout(() => ctrl.abort(), SYNC_TIMEOUT_MS);
+      let etape = 'reseau';
       try {
-        const body = JSON.stringify({
-          secret: SHARED_SECRET,
-          scans: items.map(i => ({ ts: i.ts, point: i.point }))
-        });
         const resp = await fetch(APP_URL, {
           method: 'POST',
-          body: body,
+          body: corpsLot(items),
           redirect: 'follow',
-          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+          signal: ctrl.signal
         });
+        etape = 'serveur';
         if (!resp.ok) throw new Error('HTTP ' + resp.status);
         const data = await resp.json();
         if (!data.ok) throw new Error(data.error || 'unknown');
-        await dbDelete(items.map(i => i.id));
-        setOnlineStatus(true);
-        return 'synced';
       } catch (err) {
-        setOnlineStatus(false);
-        console.warn('Sync failed:', err);
-        return 'offline';
+        const reseau = etape === 'reseau' || err.name === 'AbortError';
+        console.warn('Sync failed (' + (reseau ? 'réseau' : 'serveur') + '):', err);
+        setOnlineStatus(reseau ? 'offline' : 'serveur');
+        return reseau ? 'offline' : 'refused';
       } finally {
-        isSyncing = false;
+        clearTimeout(minuterie);
       }
+      await dbDelete(items.map(i => i.id));
+      setOnlineStatus('online');
+      return 'synced';
+    }
+    async function syncPeriodique() {
+      const result = await flushPending();
+      const n = await updatePendingBadge();
+      // L'écran de confirmation resté ouvert (l'opérateur marche vers le
+      // point suivant) passe à « Enregistré » dès que la file se vide.
+      if (overlayOpen && confirmEnAttente && n === 0 && result === 'synced') setConfirmStatusSynced();
+    }
+
+    // Envoi de dernière chance quand l'app passe en arrière-plan (écran
+    // éteint, autre app) : sans Service Worker, plus rien ne part tant
+    // qu'elle n'est pas rouverte. keepalive laisse la requête finir après
+    // la mise en veille, mais sa réponse est illisible : la file n'est pas
+    // vidée ici, le prochain envoi normal s'en charge (doPost écarte alors
+    // les scans déjà écrits).
+    async function envoyerAvantVeille() {
+      try {
+        const items = await dbGetAll();
+        if (items.length === 0 || !navigator.onLine) return;
+        const body = corpsLot(items);
+        if (new TextEncoder().encode(body).length > KEEPALIVE_MAX_OCTETS) return;
+        fetch(APP_URL, {
+          method: 'POST',
+          body: body,
+          keepalive: true,
+          headers: { 'Content-Type': 'text/plain;charset=utf-8' }
+        }).catch(() => {});
+      } catch (e) {}
     }
 
     // === Scanner ===
     async function startScanner() {
       ui.permPrompt.classList.remove('show');
+      debloquerAudio();
+      if (typeof Html5Qrcode === 'undefined') {
+        ui.permPrompt.classList.add('show');
+        ui.permPrompt.querySelector('p').textContent =
+          'Le module de scan n\'a pas pu se charger. Vérifie le signal, puis ferme et rouvre l\'app.';
+        return;
+      }
       try {
-        if (audioCtx && audioCtx.state === 'suspended') audioCtx.resume();
-        scanner = new Html5Qrcode('reader', { verbose: false });
+        // formatsToSupport va au constructeur : passé à start(), il est ignoré.
+        scanner = new Html5Qrcode('reader', {
+          verbose: false,
+          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE]
+        });
         const config = {
           fps: 10,
           qrbox: (w, h) => {
@@ -991,7 +1185,6 @@
             const size = Math.floor(min * 0.8);
             return { width: size, height: size };
           },
-          formatsToSupport: [Html5QrcodeSupportedFormats.QR_CODE],
         };
         await scanner.start(
           { facingMode: 'environment' },
@@ -999,20 +1192,70 @@
           (decoded) => handleScan(decoded),
           () => {}
         );
+        preparerTorche();
       } catch (err) {
+        scanner = null;
         ui.permPrompt.classList.add('show');
         ui.permPrompt.querySelector('p').textContent =
           'Impossible d\'accéder à la caméra : ' + (err.message || err);
       }
     }
 
+    function preparerTorche() {
+      torche = null;
+      ui.torchBtn.classList.remove('visible', 'on');
+      ui.torchBtn.setAttribute('aria-pressed', 'false');
+      try {
+        const t = scanner.getRunningTrackCameraCapabilities().torchFeature();
+        if (t.isSupported()) {
+          torche = t;
+          ui.torchBtn.classList.add('visible');
+        }
+      } catch (e) {}
+    }
+    async function basculerTorche() {
+      if (!torche) return;
+      const allumer = !ui.torchBtn.classList.contains('on');
+      try {
+        await torche.apply(allumer);
+        ui.torchBtn.classList.toggle('on', allumer);
+        ui.torchBtn.setAttribute('aria-pressed', String(allumer));
+      } catch (e) {}
+    }
+
+    // Écran éteint puis rallumé : sur certains Android, la piste vidéo se
+    // termine et l'image reste figée. On relance alors le scanner.
+    // À valider au test terrain du 2026-10-21 ; retirer si la caméra
+    // reprend toujours seule.
+    let relanceCamera = false;
+    async function verifierCamera() {
+      if (!scanner || relanceCamera) return;
+      const video = ui.reader.querySelector('video');
+      const piste = video && video.srcObject && video.srcObject.getVideoTracks()[0];
+      if (piste && piste.readyState === 'live') return;
+      relanceCamera = true;
+      try {
+        try { await scanner.stop(); } catch (e) {}
+        scanner = null;
+        ui.reader.innerHTML = '';
+        await startScanner();
+        if (overlayOpen && scanner) {
+          try { await scanner.pause(true); } catch (e) {}
+        }
+      } finally {
+        relanceCamera = false;
+      }
+    }
+
     // === Boot ===
     async function boot() {
       await updatePendingBadge();
-      setOnlineStatus(navigator.onLine);
+      setOnlineStatus(navigator.onLine ? 'online' : 'offline');
       updateTourBanner();
 
+      document.addEventListener('pointerdown', debloquerAudio, { once: true });
       ui.startBtn.addEventListener('click', startScanner);
+      ui.torchBtn.addEventListener('click', basculerTorche);
       ui.confirmNextBtn.addEventListener('click', closeConfirmOverlay);
       ui.openListBtn.addEventListener('click', openListView);
       ui.listCloseX.addEventListener('click', closeListView);
@@ -1030,18 +1273,26 @@
       });
 
       window.addEventListener('online', () => {
-        setOnlineStatus(true);
-        flushPending().then(() => updatePendingBadge());
+        setOnlineStatus('online');
+        syncPeriodique();
       });
-      window.addEventListener('offline', () => setOnlineStatus(false));
+      window.addEventListener('offline', () => setOnlineStatus('offline'));
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'hidden') {
+          envoyerAvantVeille();
+        } else {
+          updateTourBanner();
+          verifierCamera();
+          syncPeriodique();
+        }
+      });
 
       setInterval(() => {
-        if (navigator.onLine && !overlayOpen) {
-          flushPending().then(() => updatePendingBadge());
-        }
+        updateTourBanner();
+        if (navigator.onLine) syncPeriodique();
       }, SYNC_INTERVAL_MS);
 
-      flushPending().then(() => updatePendingBadge());
+      syncPeriodique();
 
       // Si la permission caméra a déjà été accordée, démarrer le scanner sans prompt.
       let cameraGranted = false;
